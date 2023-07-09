@@ -299,9 +299,22 @@ ax2.scatter(
     s=marker_size,
 )
 
-# Define the offset values
-buy_offset = 15
-sell_offset = 15
+# Marker size
+marker_size = 100
+
+# Offset percentages
+buy_offset = 0.05  # Buy marker will be placed 5% below the current price
+sell_offset = 0.05  # Sell marker will be placed 5% above the current price
+
+# Extract rows where 'Action' is 'Buy' or 'Sell'
+buy_actions = data[data["Action"] == "Buy"]
+sell_actions = data[data["Action"] == "Sell"]
+
+# Get the limits of the y-axis
+y_min, y_max = ax1.get_ylim()
+
+# Compute 5% of the range of the y-axis
+offset = (y_max - y_min) * 0.05
 
 # Add these points to the first subplot
 for buy_date, buy_data in buy_actions.iterrows():
@@ -315,7 +328,7 @@ for buy_date, buy_data in buy_actions.iterrows():
     )
     ax1.text(
         buy_date,
-        buy_data["close"] - buy_offset,  # Subtract the offset
+        buy_data["close"] - offset,  # Adjust y position by offset
         f'Buy: {buy_data["close"]:.2f}',
         color="green",
         verticalalignment="top",
@@ -333,7 +346,7 @@ for sell_date, sell_data in sell_actions.iterrows():
     )
     ax1.text(
         sell_date,
-        sell_data["close"] + sell_offset,  # Add the offset
+        sell_data["close"] + offset,  # Adjust y position by offset
         f'Sell: {sell_data["close"]:.2f}',
         color="red",
         verticalalignment="bottom",
