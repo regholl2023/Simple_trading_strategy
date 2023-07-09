@@ -299,27 +299,50 @@ ax2.scatter(
     s=marker_size,
 )
 
+# Define the offset values
+buy_offset = 15
+sell_offset = 15
+
 # Add these points to the first subplot
-ax1.scatter(
-    buy_actions.index,
-    buy_actions["close"],
-    color="green",
-    marker="^",
-    label="Buy",
-    s=marker_size,
-)
-ax1.scatter(
-    sell_actions.index,
-    sell_actions["close"],
-    color="red",
-    marker="v",
-    label="Sell",
-    s=marker_size,
-)
+for buy_date, buy_data in buy_actions.iterrows():
+    ax1.scatter(
+        buy_date,
+        buy_data["close"],
+        color="green",
+        marker="^",
+        label="Buy",
+        s=marker_size,
+    )
+    ax1.text(
+        buy_date,
+        buy_data["close"] - buy_offset,  # Subtract the offset
+        f'Buy: {buy_data["close"]:.2f}',
+        color="green",
+        verticalalignment="top",
+        horizontalalignment="center",
+    )
+
+for sell_date, sell_data in sell_actions.iterrows():
+    ax1.scatter(
+        sell_date,
+        sell_data["close"],
+        color="red",
+        marker="v",
+        label="Sell",
+        s=marker_size,
+    )
+    ax1.text(
+        sell_date,
+        sell_data["close"] + sell_offset,  # Add the offset
+        f'Sell: {sell_data["close"]:.2f}',
+        color="red",
+        verticalalignment="bottom",
+        horizontalalignment="center",
+    )
 
 # Update the legends for the subplots to include the 'Buy' and 'Sell' actions
 ax2.legend()
-ax1.legend()
+# ax1.legend()
 
 plt.tight_layout()
 plt.show()
