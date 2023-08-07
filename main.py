@@ -236,12 +236,16 @@ else:
 
 # Print the most recent action
 if last_action:
+    # Find the row number from the end where the last action date is
+    rows_from_end = len(data) - data.index.get_loc(last_action_date)
+
+    # Print the rows starting from the last action date till the end
+    # print(data[-rows_from_end:])
+
     days_ago = (end_date - last_action_date.date()).days
-    print(f"The last action was a {last_action} on {last_action_date.strftime('%Y-%m-%d')} ({days_ago} days ago) at a price of {last_action_price:.2f}")
+    print(f"The last action was a {last_action} on {last_action_date.strftime('%Y-%m-%d')} ({days_ago} days ago, or {rows_from_end} trading-days ago) at a price of {last_action_price:.2f}")
 else:
     print("No Buy or Sell actions were recorded.")
-
-print(data[-days_ago:])
 
 data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(
     abs(data["close_detrend"])
