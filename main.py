@@ -100,6 +100,21 @@ df = api.get_bars(
 ).df
 data = pd.DataFrame(df["close"])
 
+# Get current_price
+current_price = api.get_latest_trade(symbol).price
+
+# Compare the last date in the data dataframe with the current date
+last_date_in_data = data.index[-1].date()
+end_date_tz = pd.Timestamp(end_date).tz_localize(data.index.tz)
+
+if last_date_in_data == end_date_tz.date():
+    # If they are the same and the current price is different, replace the stored price
+    if current_price != data.iloc[-1, 0]:
+        data.iloc[-1, 0] = current_price
+else:
+    # Append the date and current price to the data dataframe
+    data = data.append(pd.DataFrame({'close': current_price}, index=[end_date_tz]))
+
 # Store datetime information in a new column
 data["DateTime"] = data.index
 
@@ -190,7 +205,7 @@ for i in range(
 # Set 'DateTime' as the index
 data.set_index("DateTime", inplace=True)
 
-print(data)
+# print(data)
 
 data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(
     abs(data["close_detrend"])
@@ -356,7 +371,6 @@ for sell_date, sell_data in sell_actions.iterrows():
 
 # Update the legends for the subplots to include the 'Buy' and 'Sell' actions
 ax2.legend()
-# ax1.legend()
 
 plt.tight_layout()
 plt.show()
