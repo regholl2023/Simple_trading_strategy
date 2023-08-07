@@ -205,7 +205,43 @@ for i in range(
 # Set 'DateTime' as the index
 data.set_index("DateTime", inplace=True)
 
-# print(data)
+# Extract rows where 'Action' is 'Buy' or 'Sell'
+buy_actions = data[data["Action"] == "Buy"]
+sell_actions = data[data["Action"] == "Sell"]
+
+# Get the last buy and sell dates
+last_buy_date = buy_actions.index[-1] if not buy_actions.empty else None
+last_sell_date = sell_actions.index[-1] if not sell_actions.empty else None
+
+# Determine the most recent action and print it
+if last_buy_date and last_sell_date:
+    if last_buy_date > last_sell_date:
+        last_action = "Buy"
+        last_action_date = last_buy_date
+        last_action_price = buy_actions.loc[last_buy_date, "close"]
+    else:
+        last_action = "Sell"
+        last_action_date = last_sell_date
+        last_action_price = sell_actions.loc[last_sell_date, "close"]
+elif last_buy_date:
+    last_action = "Buy"
+    last_action_date = last_buy_date
+    last_action_price = buy_actions.loc[last_buy_date, "close"]
+elif last_sell_date:
+    last_action = "Sell"
+    last_action_date = last_sell_date
+    last_action_price = sell_actions.loc[last_sell_date, "close"]
+else:
+    last_action = None
+
+# Print the most recent action
+if last_action:
+    days_ago = (end_date - last_action_date.date()).days
+    print(f"The last action was a {last_action} on {last_action_date.strftime('%Y-%m-%d')} ({days_ago} days ago) at a price of {last_action_price:.2f}")
+else:
+    print("No Buy or Sell actions were recorded.")
+
+print(data[-days_ago:])
 
 data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(
     abs(data["close_detrend"])
