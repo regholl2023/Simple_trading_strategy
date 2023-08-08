@@ -105,7 +105,7 @@ def plot_close_price(data, symbol, ax1, color_dict):
     data["close"].plot(
         ax=ax1,
         grid=True,
-        title=f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} to {data.index.max().strftime("%Y-%m-%d")}, last close price: {data["close"].iloc[-1]}',
+        title=f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}',
     )
 
     data["close_detrend_norm_filt_adj"].plot(

@@ -83,7 +83,7 @@ class DataPlotter:
         data["close"].plot(
             ax=ax1,
             grid=True,
-            title=f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} to {data.index.max().strftime("%Y-%m-%d")}, last close price: {data["close"].iloc[-1]}',
+            title=f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}',
         )
         data["close_detrend_norm_filt_adj"].plot(
             ax=ax1, grid=True, color="black", label="Filtered Close Price"
