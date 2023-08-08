@@ -52,6 +52,8 @@ Here is AAPL at a later time:
 
 ![Example_plot_display](images/Figure_2.png)
 
+The last action was a Sell on 2023-07-20 (18 days ago, or 13 trading-days ago) at a price of 193.13
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
