@@ -46,7 +46,11 @@ python main.py -s AAPL -n 504 -w 31 -sd 0.01 -t Day
 python main.py -s AAPL -n 504 -w 31 -sd 0.01 -t Day
 ```
 
-![Example_plot_display](Figure_1.png)
+![Example_plot_display](images/Figure_1.png)
+
+Here is AAPL at a later time:
+
+![Example_plot_display](images/Figure_2.png)
 
 ## License
 
