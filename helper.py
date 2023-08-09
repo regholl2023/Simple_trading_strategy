@@ -1,4 +1,5 @@
 import os
+import subprocess
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -129,14 +130,23 @@ def plot_close_price(data, symbol, ax1, color_dict):
     ax1.grid(color="lightgrey")
     ax1.legend()
 
+def get_company_name(symbol_namespace):
+    symbol = symbol_namespace.symbol.upper()
+    file_path = 'tickers.txt'
+    command = f"awk -F '|' '$1 == \"{symbol}\" {{print $2}}' {file_path}"
+    result = subprocess.run(command, stdout=subprocess.PIPE, shell=True, text=True)
+    return result.stdout.strip() or ''
+
 def plot_detrended_data(data, args, ax2):
     # Plotting detrended, normalized close price and the filtered data
     # ... (rest of the code for plotting detrended data)
 
+    company_name = get_company_name(args)
+
     data["close_detrend_norm"].plot(
         ax=ax2,
         grid=True,
-        title="Detrended and Normalized Close Price",
+        title = f"Detrended and Normalized Close Price for {company_name}" if company_name else "Detrended and Normalized Close Price",
         label="Detrended and Normalized",
     )
     data["close_detrend_norm_filt"].plot(
