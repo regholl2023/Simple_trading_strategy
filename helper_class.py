@@ -72,7 +72,7 @@ class ActionComputer:
             rows_from_end = len(data) - data.index.get_loc(last_action_date)
             days_ago = (end_date - last_action_date.date()).days
             print(
-                f"The last action was a {last_action} on {last_action_date.strftime('%Y-%m-%d')} ({days_ago} days ago, or {rows_from_end} trading-days ago) at a price of {last_action_price:.2f}"
+                    f'The last action was a {last_action} on {last_action_date.strftime("%Y-%m-%d")} ({days_ago} days ago, or {rows_from_end} trading-days ago) at a price of {last_action_price:.2f}, last price {data["close"].iloc[-1]:.3f}'
             )
         else:
             print("No Buy or Sell actions were recorded.")
