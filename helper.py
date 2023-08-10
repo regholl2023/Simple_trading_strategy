@@ -1,71 +1,48 @@
+"""
+Module containing helper functions for fetching, processing, and plotting financial data.
+"""
+
 import os
 import subprocess
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-from datetime import date
 from alpaca_trade_api.rest import REST
+import pandas as pd
 
-def fetch_data(symbol, timeframe, start_date, end_date, ndays):
-    # Get API keys from environment variables
+def fetch_data(symbol, timeframe, start_date, end_date):
+    """
+    Fetches financial data for the given symbol and timeframe.
+    """
     api_key = os.getenv("APCA_API_KEY_ID")
     api_secret = os.getenv("APCA_API_SECRET_KEY")
-
-    # Instantiate Alpaca API
     api = REST(api_key, api_secret)
-
-    # Fetch OHLC data
-    df = api.get_bars(
+    data_frame = api.get_bars(
         symbol,
         timeframe,
         start_date.isoformat(),
         end_date.isoformat(),
         adjustment="split",
     ).df
-    data = pd.DataFrame(df["close"])
-
-    # Convert the index to datetime type
+    data = pd.DataFrame(data_frame["close"])
     data.index = pd.to_datetime(data.index)
-
-    # Get current_price
     current_price = api.get_latest_trade(symbol).price
-
-    # Compare the last date in the data dataframe with the current date
     last_date_in_data = data.index[-1].date()
     end_date_tz = pd.Timestamp(end_date).tz_localize(data.index.tz)
-
     if last_date_in_data == end_date_tz.date():
-        # If they are the same and the current price is different, replace the stored price
         if current_price != data.iloc[-1, 0]:
             data.iloc[-1, 0] = current_price
     else:
-        # Append the date and current price to the data dataframe
-        data = data.append(
-            pd.DataFrame({"close": current_price}, index=[end_date_tz])
-        )
-
-    # Store datetime information in a new column
+        data = data.append(pd.DataFrame({"close": current_price}, index=[end_date_tz]))
     data["DateTime"] = data.index
-
-    # Reset index and drop the old one
     data.reset_index(drop=True, inplace=True)
-
     return current_price, data
 
 def compute_actions(symbol, data, end_date):
-    # Logic to compute actions (Buy/Sell) and print the most recent action
-    # ... (rest of the code for computing actions and printing details)
-
-    # Extract rows where 'Action' is 'Buy' or 'Sell'
+    """
+    Computes and prints the most recent action (Buy/Sell) for the given data.
+    """
     buy_actions = data[data["Action"] == "Buy"]
     sell_actions = data[data["Action"] == "Sell"]
-
-    # Get the last buy and sell dates
     last_buy_date = buy_actions.index[-1] if not buy_actions.empty else None
     last_sell_date = sell_actions.index[-1] if not sell_actions.empty else None
-
-    # Determine the most recent action and print it
     if last_buy_date and last_sell_date:
         if last_buy_date > last_sell_date:
             last_action = "Buy"
@@ -87,28 +64,28 @@ def compute_actions(symbol, data, end_date):
         last_action = None
 
     if last_action:
-        # Find the row number from the end where the last action date is
         rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
-
         days_ago = (end_date - last_action_date.date()).days
-        print(
-            f'{symbol:5s} last action was {last_action:4s} on {last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {data["close"].iloc[-1]:8.3f}'
+        action_msg = (
+            f'{symbol:5s} last action was {last_action:4s} on '
+            f'{last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, '
+            f'or {rows_from_end:4d} trading-days ago) at a price of '
+            f'{last_action_price:8.3f} last price {data["close"].iloc[-1]:8.3f}'
         )
+        print(action_msg)
     else:
         print("No Buy or Sell actions were recorded.")
 
-    return
-
 def plot_close_price(data, symbol, ax1, color_dict):
-    # Plotting close price and filtered close price
-    # ... (rest of the code for plotting close price)
-
+    """
+    Plots the close price and filtered close price.
+    """
     data["close"].plot(
         ax=ax1,
         grid=True,
-        title=f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}',
+        title=f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} to '
+        f'{data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}',
     )
-
     data["close_detrend_norm_filt_adj"].plot(
         ax=ax1, grid=True, color="black", label="Filtered Close Price"
     )
@@ -131,23 +108,27 @@ def plot_close_price(data, symbol, ax1, color_dict):
     ax1.legend()
 
 def get_company_name(symbol_namespace):
+    """
+    Retrieves the company name for the given symbol namespace.
+    """
     symbol = symbol_namespace.symbol.upper()
     file_path = 'tickers.txt'
     command = f"awk -F '|' '$1 == \"{symbol}\" {{print $2}}' {file_path}"
-    result = subprocess.run(command, stdout=subprocess.PIPE, shell=True, text=True)
+    result = subprocess.run(command, stdout=subprocess.PIPE, shell=True, text=True, check=True)
     return result.stdout.strip() or ''
 
 def plot_detrended_data(data, args, ax2):
-    # Plotting detrended, normalized close price and the filtered data
-    # ... (rest of the code for plotting detrended data)
-
+    """
+    Plots the detrended and normalized close price and the filtered data.
+    """
     company_name = get_company_name(args)
-
+    title = (
+        f"Detrended and Normalized Close Price for {company_name}"
+        if company_name
+        else "Detrended and Normalized Close Price"
+    )
     data["close_detrend_norm"].plot(
-        ax=ax2,
-        grid=True,
-        title = f"Detrended and Normalized Close Price for {company_name}" if company_name else "Detrended and Normalized Close Price",
-        label="Detrended and Normalized",
+        ax=ax2, grid=True, title=title, label="Detrended and Normalized"
     )
     data["close_detrend_norm_filt"].plot(
         ax=ax2, grid=True, label="Low-pass Filtered"
@@ -158,15 +139,13 @@ def plot_detrended_data(data, args, ax2):
     ax2.legend()
 
 def plot_z_score_velocity(data, args, ax3):
-    # Plotting z-score of the filtered velocity
-    # ... (rest of the code for plotting z-score velocity)
-
+    """
+    Plots the z-score of the filtered velocity.
+    """
     ax3.plot(data.index, data["zscore_velocity"], color="blue")
     ax3.axhline(0, color="black", linewidth=1)
     ax3.axhline(args.std_dev, color="black", linewidth=1, linestyle="--")
     ax3.axhline(-args.std_dev, color="black", linewidth=1, linestyle="--")
-
-    # Color z-score values above +std_dev in red and below -std_dev in green
     ax3.fill_between(
         data.index,
         data["zscore_velocity"],
@@ -183,23 +162,18 @@ def plot_z_score_velocity(data, args, ax3):
         facecolor="green",
         alpha=0.3,
     )
-
     ax3.set_xlabel("Date")
     ax3.set_ylabel("Filtered Velocity (Z-score)")
     ax3.set_title("Z-score of Filtered Velocity")
     ax3.grid(color="lightgrey")
 
 def plot_buy_sell_markers(data, ax1, ax2):
-    # Plotting buy and sell markers
-    # ... (rest of the code for plotting buy and sell markers)
-
+    """
+    Plots buy and sell markers.
+    """
     marker_size = 100
-
-    # Extract rows where 'Action' is 'Buy' or 'Sell'
     buy_actions = data[data["Action"] == "Buy"]
     sell_actions = data[data["Action"] == "Sell"]
-
-    # Add these points to the second subplot
     ax2.scatter(
         buy_actions.index,
         buy_actions["close_detrend_norm"],
@@ -216,37 +190,15 @@ def plot_buy_sell_markers(data, ax1, ax2):
         label="Sell",
         s=marker_size,
     )
-
-    # Marker size
-    marker_size = 100
-
-    # Offset percentages
-    buy_offset = 0.05  # Buy marker will be placed 5% below the current price
-    sell_offset = 0.05  # Sell marker will be placed 5% above the current price
-
-    # Extract rows where 'Action' is 'Buy' or 'Sell'
-    buy_actions = data[data["Action"] == "Buy"]
-    sell_actions = data[data["Action"] == "Sell"]
-
-    # Get the limits of the y-axis
     y_min, y_max = ax1.get_ylim()
-
-    # Compute 5% of the range of the y-axis
     offset = (y_max - y_min) * 0.05
-
-    # Add these points to the first subplot
     for buy_date, buy_data in buy_actions.iterrows():
         ax1.scatter(
-            buy_date,
-            buy_data["close"],
-            color="green",
-            marker="^",
-            label="Buy",
-            s=marker_size,
+            buy_date, buy_data["close"], color="green", marker="^", label="Buy", s=marker_size
         )
         ax1.text(
             buy_date,
-            buy_data["close"] - offset,  # Adjust y position by offset
+            buy_data["close"] - offset,
             f'Buy: {buy_data["close"]:.2f}',
             color="green",
             verticalalignment="top",
@@ -255,16 +207,11 @@ def plot_buy_sell_markers(data, ax1, ax2):
 
     for sell_date, sell_data in sell_actions.iterrows():
         ax1.scatter(
-            sell_date,
-            sell_data["close"],
-            color="red",
-            marker="v",
-            label="Sell",
-            s=marker_size,
+            sell_date, sell_data["close"], color="red", marker="v", label="Sell", s=marker_size
         )
         ax1.text(
             sell_date,
-            sell_data["close"] + offset,  # Adjust y position by offset
+            sell_data["close"] + offset,
             f'Sell: {sell_data["close"]:.2f}',
             color="red",
             verticalalignment="bottom",
