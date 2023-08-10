@@ -70,7 +70,7 @@ class ActionComputer:
             last_action = None
 
         if last_action:
-            rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
+            rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1 
             days_ago = (end_date - last_action_date.date()).days
             print(
                 f'{symbol:5s} last action was {last_action:4s} on {last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {data["close"].iloc[-1]:8.3f}'

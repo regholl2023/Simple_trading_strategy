@@ -53,7 +53,7 @@ def fetch_data(symbol, timeframe, start_date, end_date, ndays):
 
     return current_price, data
 
-def compute_actions(data, end_date):
+def compute_actions(symbol, data, end_date):
     # Logic to compute actions (Buy/Sell) and print the most recent action
     # ... (rest of the code for computing actions and printing details)
 
@@ -88,12 +88,12 @@ def compute_actions(data, end_date):
 
     if last_action:
         # Find the row number from the end where the last action date is
-        rows_from_end = len(data) - data.index.get_loc(last_action_date)
+        rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
 
         days_ago = (end_date - last_action_date.date()).days
         print(
-                f'The last action was a {last_action} on {last_action_date.strftime("%Y-%m-%d")} ({days_ago} days ago, or {rows_from_end} trading-days ago) at a price of {last_action_price:.2f} last price {data["close"].iloc[-1]:.3f}'
-    )
+            f'{symbol:5s} last action was {last_action:4s} on {last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {data["close"].iloc[-1]:8.3f}'
+        )
     else:
         print("No Buy or Sell actions were recorded.")
 

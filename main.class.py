@@ -111,7 +111,7 @@ for i in range(1, len(data)):  # start from the second row since we are checking
 data.set_index("DateTime", inplace=True)
 
 # Compute last action and print important information
-ActionComputer.compute_actions(data, end_date)
+ActionComputer.compute_actions(symbol, data, end_date)
 
 data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(abs(data["close_detrend"])) + trend_line(x)
 
