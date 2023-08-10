@@ -1,36 +1,47 @@
+"""Module for fetching and plotting stock market data."""
+
 import os
 import subprocess
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
-from datetime import date
 from alpaca_trade_api.rest import REST
 
-class DataFetcher:
+
+class DataConfig:
+    """Class to hold data configuration."""
+
     def __init__(self, symbol, timeframe, start_date, end_date, ndays):
         self.symbol = symbol
         self.timeframe = timeframe
         self.start_date = start_date
         self.end_date = end_date
         self.ndays = ndays
+
+
+class DataFetcher:
+    """Class for fetching stock market data."""
+
+    def __init__(self, config):
+        self.config = config
         self.api_key = os.getenv("APCA_API_KEY_ID")
         self.api_secret = os.getenv("APCA_API_SECRET_KEY")
         self.api = REST(self.api_key, self.api_secret)
 
     def fetch_data(self):
-        df = self.api.get_bars(
-            self.symbol,
-            self.timeframe,
-            self.start_date.isoformat(),
-            self.end_date.isoformat(),
+        """Fetch stock market data."""
+        data_frame = self.api.get_bars(
+            self.config.symbol,
+            self.config.timeframe,
+            self.config.start_date.isoformat(),
+            self.config.end_date.isoformat(),
             adjustment="split",
         ).df
-        data = pd.DataFrame(df["close"])
+        data = pd.DataFrame(data_frame["close"])
         data.index = pd.to_datetime(data.index)
-        current_price = self.api.get_latest_trade(self.symbol).price
+        current_price = self.api.get_latest_trade(self.config.symbol).price
         last_date_in_data = data.index[-1].date()
-        end_date_tz = pd.Timestamp(self.end_date).tz_localize(data.index.tz)
+        end_date_tz = pd.Timestamp(self.config.end_date).tz_localize(
+            data.index.tz
+        )
         if last_date_in_data == end_date_tz.date():
             if current_price != data.iloc[-1, 0]:
                 data.iloc[-1, 0] = current_price
@@ -42,13 +53,21 @@ class DataFetcher:
         data.reset_index(drop=True, inplace=True)
         return current_price, data
 
+
 class ActionComputer:
+    """Class to compute buy/sell actions."""
+
     @staticmethod
     def compute_actions(symbol, data, end_date):
+        """Compute buy/sell actions."""
         buy_actions = data[data["Action"] == "Buy"]
         sell_actions = data[data["Action"] == "Sell"]
-        last_buy_date = buy_actions.index[-1] if not buy_actions.empty else None
-        last_sell_date = sell_actions.index[-1] if not sell_actions.empty else None
+        last_buy_date = (
+            buy_actions.index[-1] if not buy_actions.empty else None
+        )
+        last_sell_date = (
+            sell_actions.index[-1] if not sell_actions.empty else None
+        )
         if last_buy_date and last_sell_date:
             if last_buy_date > last_sell_date:
                 last_action = "Buy"
@@ -70,7 +89,9 @@ class ActionComputer:
             last_action = None
 
         if last_action:
-            rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
+            rows_from_end = (
+                len(data) - data.index.get_loc(last_action_date) - 1
+            )
             days_ago = (end_date - last_action_date.date()).days
             print(
                 f'{symbol:5s} last action was {last_action:4s} on {last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {data["close"].iloc[-1]:8.3f}'
@@ -78,17 +99,24 @@ class ActionComputer:
         else:
             print("No Buy or Sell actions were recorded.")
 
+
 def get_company_name(symbol_namespace):
+    """Get company name by symbol."""
     symbol = symbol_namespace.symbol.upper()
-    file_path = 'tickers.txt'
+    file_path = "tickers.txt"
     command = f"awk -F '|' '$1 == \"{symbol}\" {{print $2}}' {file_path}"
-    result = subprocess.run(command, stdout=subprocess.PIPE, shell=True, text=True)
-    return result.stdout.strip() or ''
+    result = subprocess.run(
+        command, stdout=subprocess.PIPE, shell=True, text=True, check=True
+    )
+    return result.stdout.strip() or ""
 
 
 class DataPlotter:
+    """Class to plot stock market data."""
+
     @staticmethod
     def plot_close_price(data, symbol, ax1, color_dict):
+        """Plot close price."""
         data["close"].plot(
             ax=ax1,
             grid=True,
@@ -117,8 +145,13 @@ class DataPlotter:
 
     @staticmethod
     def plot_detrended_data(data, symbol, ax2):
+        """Plot detrended data."""
         company_name = get_company_name(symbol)
-        title = f"Detrended and Normalized Close Price for {company_name}" if company_name else "Detrended and Normalized Close Price"
+        title = (
+            f"Detrended and Normalized Close Price for {company_name}"
+            if company_name
+            else "Detrended and Normalized Close Price"
+        )
         data["close_detrend_norm"].plot(
             ax=ax2,
             grid=True,
@@ -135,6 +168,7 @@ class DataPlotter:
 
     @staticmethod
     def plot_z_score_velocity(data, args, ax3):
+        """Plot z-score velocity."""
         ax3.plot(data.index, data["zscore_velocity"], color="blue")
         ax3.axhline(0, color="black", linewidth=1)
         ax3.axhline(args.std_dev, color="black", linewidth=1, linestyle="--")
@@ -162,6 +196,7 @@ class DataPlotter:
 
     @staticmethod
     def plot_buy_sell_markers(data, ax1, ax2):
+        """Plot buy/sell markers."""
         marker_size = 100
         buy_actions = data[data["Action"] == "Buy"]
         sell_actions = data[data["Action"] == "Sell"]
@@ -181,11 +216,6 @@ class DataPlotter:
             label="Sell",
             s=marker_size,
         )
-        marker_size = 100
-        buy_offset = 0.05
-        sell_offset = 0.05
-        buy_actions = data[data["Action"] == "Buy"]
-        sell_actions = data[data["Action"] == "Sell"]
         y_min, y_max = ax1.get_ylim()
         offset = (y_max - y_min) * 0.05
         for buy_date, buy_data in buy_actions.iterrows():
