@@ -1,224 +1,174 @@
 import os
+import requests
 import subprocess
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import pandas_market_calendars as mcal
 
-from datetime import date
+from datetime import date, datetime
+from dateutil.tz import tzlocal
 from alpaca_trade_api.rest import REST
 
+
 class DataFetcher:
-    def __init__(self, symbol, timeframe, start_date, end_date, ndays):
-        self.symbol = symbol
+    def __init__(self, symbols, timeframe, ndays):
+        self.symbols = symbols
         self.timeframe = timeframe
-        self.start_date = start_date
-        self.end_date = end_date
         self.ndays = ndays
         self.api_key = os.getenv("APCA_API_KEY_ID")
         self.api_secret = os.getenv("APCA_API_SECRET_KEY")
         self.api = REST(self.api_key, self.api_secret)
 
-    def fetch_data(self):
-        df = self.api.get_bars(
-            self.symbol,
-            self.timeframe,
-            self.start_date.isoformat(),
-            self.end_date.isoformat(),
-            adjustment="split",
-        ).df
-        data = pd.DataFrame(df["close"])
-        data.index = pd.to_datetime(data.index)
-        current_price = self.api.get_latest_trade(self.symbol).price
-        last_date_in_data = data.index[-1].date()
-        end_date_tz = pd.Timestamp(self.end_date).tz_localize(data.index.tz)
-        if last_date_in_data == end_date_tz.date():
-            if current_price != data.iloc[-1, 0]:
-                data.iloc[-1, 0] = current_price
-        else:
-            data = data.append(
-                pd.DataFrame({"close": current_price}, index=[end_date_tz])
+    def calculate_start_date(self):
+        nyse = mcal.get_calendar("NYSE")
+        end_date = pd.Timestamp.now().normalize()
+        start_date = pd.Timestamp("2000-01-01")
+        trading_days = nyse.valid_days(
+            start_date=start_date, end_date=end_date
+        )
+
+        if len(trading_days) < self.ndays:
+            raise ValueError(
+                "The number of trading days requested is more than the available trading days."
             )
-        data["DateTime"] = data.index
-        data.reset_index(drop=True, inplace=True)
-        return current_price, data
+
+        start_date = trading_days[-self.ndays]
+        return start_date
+
+    def fetch_historical_data_v2(self):
+        """Fetch historical data using Alpaca's multi-bar API v2 and handle pagination."""
+
+        # Join symbols into a comma-separated string
+        symbol_str = ",".join(self.symbols)
+
+        # Set the base URL for the Alpaca API
+        base_url = "https://data.alpaca.markets/v2/stocks"
+
+        # Initialize an empty DataFrame to store the results
+        data = pd.DataFrame()
+
+        # Initialize the page_token
+        page_token = None
+
+        # Calculate the start and end date
+        start_date = self.calculate_start_date().strftime("%Y-%m-%d")
+        end_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+
+        while True:
+            # Build the query parameters
+            params = {
+                "start": start_date,
+                "end": end_date,
+                "timeframe": self.timeframe,
+                "limit": 10000,
+                "adjustment": "split",
+                "symbols": symbol_str,
+                "feed": "sip",
+            }
+            if page_token is not None:
+                params["page_token"] = page_token
+
+            # Send the GET request to the Alpaca API
+            url = f"{base_url}/bars"
+            headers = {
+                "APCA-API-KEY-ID": self.api_key,
+                "APCA-API-SECRET-KEY": self.api_secret,
+            }
+            response = requests.get(url, headers=headers, params=params)
+
+            # Raise an exception if the request was unsuccessful
+            response.raise_for_status()
+
+            # Load the response data into a JSON object
+            response_json = response.json()
+
+            # Append the data for each symbol to the DataFrame
+            for symbol, bars in list(
+                response_json["bars"].items()
+            ):  # Create a list copy for iteration
+                df = pd.DataFrame(bars)
+                df = df[["c", "t"]]
+                df["symbol"] = symbol
+                current_price = self.api.get_latest_trade(symbol).price
+
+                last_date_in_data_str = df["t"].iloc[-1]
+                last_date_in_data = datetime.strptime(
+                    last_date_in_data_str, "%Y-%m-%dT%H:%M:%SZ"
+                )
+                last_date = last_date_in_data.strftime("%Y-%m-%d")
+
+                if last_date == end_date:
+                    if current_price != df["c"].iloc[-1]:
+                        df.loc[df.index[-1], "c"] = current_price
+                else:
+                    today = pd.Timestamp.today()
+                    new_row = pd.DataFrame(
+                        {
+                            "c": [current_price],
+                            "symbol": [symbol],
+                            "t": [today],
+                        }
+                    )
+                    df = df.append(new_row, ignore_index=True)
+
+                df = df[-self.ndays :]
+                data = data.append(df)
+
+            # If there's a next_page_token, update the page_token and continue the loop
+            page_token = response_json.get("next_page_token")
+            if page_token is None:
+                break
+
+        return data, end_date
+
 
 class ActionComputer:
     @staticmethod
     def compute_actions(symbol, data, end_date):
         buy_actions = data[data["Action"] == "Buy"]
         sell_actions = data[data["Action"] == "Sell"]
-        last_buy_date = buy_actions.index[-1] if not buy_actions.empty else None
-        last_sell_date = sell_actions.index[-1] if not sell_actions.empty else None
+        last_buy_date = (
+            buy_actions.index[-1] if not buy_actions.empty else None
+        )
+        last_sell_date = (
+            sell_actions.index[-1] if not sell_actions.empty else None
+        )
         if last_buy_date and last_sell_date:
             if last_buy_date > last_sell_date:
                 last_action = "Buy"
                 last_action_date = last_buy_date
-                last_action_price = buy_actions.loc[last_buy_date, "close"]
+                last_action_price = buy_actions.loc[last_buy_date, "c"]
             else:
                 last_action = "Sell"
                 last_action_date = last_sell_date
-                last_action_price = sell_actions.loc[last_sell_date, "close"]
+                last_action_price = sell_actions.loc[last_sell_date, "c"]
         elif last_buy_date:
             last_action = "Buy"
             last_action_date = last_buy_date
-            last_action_price = buy_actions.loc[last_buy_date, "close"]
+            last_action_price = buy_actions.loc[last_buy_date, "c"]
         elif last_sell_date:
             last_action = "Sell"
             last_action_date = last_sell_date
-            last_action_price = sell_actions.loc[last_sell_date, "close"]
+            last_action_price = sell_actions.loc[last_sell_date, "c"]
         else:
             last_action = None
 
         if last_action:
-            rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1 
-            days_ago = (end_date - last_action_date.date()).days
+            rows_from_end = (
+                len(data) - data.index.get_loc(last_action_date) - 1
+            )
+            if isinstance(last_action_date, str):
+                date_object = datetime.strptime(
+                    last_action_date, "%Y-%m-%dT%H:%M:%SZ"
+                )
+            else:
+                date_object = last_action_date.to_pydatetime()
+            date_string = date_object.strftime("%Y-%m-%d")
+            end_date_object = datetime.strptime(end_date, "%Y-%m-%d")
+            date_object = datetime.strptime(date_string, "%Y-%m-%d")
+            days_ago = (end_date_object - date_object).days
             print(
-                f'{symbol:5s} last action was {last_action:4s} on {last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {data["close"].iloc[-1]:8.3f}'
+                f'{symbol:5s} last action was {last_action:4s} on {date_string} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {data["c"].iloc[-1]:8.3f}'
             )
         else:
             print("No Buy or Sell actions were recorded.")
-
-def get_company_name(symbol_namespace):
-    symbol = symbol_namespace.symbol.upper()
-    file_path = 'tickers.txt'
-    command = f"awk -F '|' '$1 == \"{symbol}\" {{print $2}}' {file_path}"
-    result = subprocess.run(command, stdout=subprocess.PIPE, shell=True, text=True)
-    return result.stdout.strip() or ''
-
-
-class DataPlotter:
-    @staticmethod
-    def plot_close_price(data, symbol, ax1, color_dict):
-        data["close"].plot(
-            ax=ax1,
-            grid=True,
-            title=f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}',
-        )
-        data["close_detrend_norm_filt_adj"].plot(
-            ax=ax1, grid=True, color="black", label="Filtered Close Price"
-        )
-        previous_row = data.iloc[0]
-        for i, row in data.iloc[1:].iterrows():
-            segment_color = color_dict.get(row["Color"], "black")
-            ax1.plot(
-                [previous_row.name, i],
-                [
-                    previous_row["close_detrend_norm_filt_adj"],
-                    row["close_detrend_norm_filt_adj"],
-                ],
-                color=segment_color,
-                alpha=0.12,
-                linewidth=7.0,
-            )
-            previous_row = row
-        ax1.set_ylabel("Price")
-        ax1.grid(color="lightgrey")
-        ax1.legend()
-
-    @staticmethod
-    def plot_detrended_data(data, symbol, ax2):
-        company_name = get_company_name(symbol)
-        title = f"Detrended and Normalized Close Price for {company_name}" if company_name else "Detrended and Normalized Close Price"
-        data["close_detrend_norm"].plot(
-            ax=ax2,
-            grid=True,
-            title=title,
-            label="Detrended and Normalized",
-        )
-        data["close_detrend_norm_filt"].plot(
-            ax=ax2, grid=True, label="Low-pass Filtered"
-        )
-        ax2.set_xlabel("Date")
-        ax2.set_ylabel("Normalized and Filtered Price")
-        ax2.grid(color="lightgrey")
-        ax2.legend()
-
-    @staticmethod
-    def plot_z_score_velocity(data, args, ax3):
-        ax3.plot(data.index, data["zscore_velocity"], color="blue")
-        ax3.axhline(0, color="black", linewidth=1)
-        ax3.axhline(args.std_dev, color="black", linewidth=1, linestyle="--")
-        ax3.axhline(-args.std_dev, color="black", linewidth=1, linestyle="--")
-        ax3.fill_between(
-            data.index,
-            data["zscore_velocity"],
-            args.std_dev,
-            where=data["zscore_velocity"] > args.std_dev,
-            facecolor="red",
-            alpha=0.3,
-        )
-        ax3.fill_between(
-            data.index,
-            data["zscore_velocity"],
-            -args.std_dev,
-            where=data["zscore_velocity"] < -args.std_dev,
-            facecolor="green",
-            alpha=0.3,
-        )
-        ax3.set_xlabel("Date")
-        ax3.set_ylabel("Filtered Velocity (Z-score)")
-        ax3.set_title("Z-score of Filtered Velocity")
-        ax3.grid(color="lightgrey")
-
-    @staticmethod
-    def plot_buy_sell_markers(data, ax1, ax2):
-        marker_size = 100
-        buy_actions = data[data["Action"] == "Buy"]
-        sell_actions = data[data["Action"] == "Sell"]
-        ax2.scatter(
-            buy_actions.index,
-            buy_actions["close_detrend_norm"],
-            color="green",
-            marker="^",
-            label="Buy",
-            s=marker_size,
-        )
-        ax2.scatter(
-            sell_actions.index,
-            sell_actions["close_detrend_norm"],
-            color="red",
-            marker="v",
-            label="Sell",
-            s=marker_size,
-        )
-        marker_size = 100
-        buy_offset = 0.05
-        sell_offset = 0.05
-        buy_actions = data[data["Action"] == "Buy"]
-        sell_actions = data[data["Action"] == "Sell"]
-        y_min, y_max = ax1.get_ylim()
-        offset = (y_max - y_min) * 0.05
-        for buy_date, buy_data in buy_actions.iterrows():
-            ax1.scatter(
-                buy_date,
-                buy_data["close"],
-                color="green",
-                marker="^",
-                label="Buy",
-                s=marker_size,
-            )
-            ax1.text(
-                buy_date,
-                buy_data["close"] - offset,
-                f'Buy: {buy_data["close"]:.2f}',
-                color="green",
-                verticalalignment="top",
-                horizontalalignment="center",
-            )
-        for sell_date, sell_data in sell_actions.iterrows():
-            ax1.scatter(
-                sell_date,
-                sell_data["close"],
-                color="red",
-                marker="v",
-                label="Sell",
-                s=marker_size,
-            )
-            ax1.text(
-                sell_date,
-                sell_data["close"] + offset,
-                f'Sell: {sell_data["close"]:.2f}',
-                color="red",
-                verticalalignment="bottom",
-                horizontalalignment="center",
-            )
