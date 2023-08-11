@@ -48,7 +48,6 @@ parser.add_argument(
     "--window",
     help="Define window size for the Hanning filter",
     type=int,
-    default=31,
 )
 parser.add_argument(
     "-sd",
@@ -104,6 +103,11 @@ data["close_detrend"] = data["close"] - trend_line(x)
 data["close_detrend_norm"] = data["close_detrend"] / max(
     abs(data["close_detrend"])
 )
+
+if args.window is None or args.window == 0:
+    args.window = round(args.ndays // 10)
+    if (args.window % 2) == 0:
+        args.window += 1
 
 window_size = args.window
 data_filter_val, gradient_val, intercept_val = compute_trend_and_filter(
