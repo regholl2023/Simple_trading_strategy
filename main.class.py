@@ -6,8 +6,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pandas_market_calendars as mcal
+
 from scipy import signal
 from alpaca_trade_api.rest import TimeFrame
+from matplotlib.offsetbox import AnchoredText
 from helper_class import DataConfig, DataFetcher, ActionComputer, DataPlotter
 
 pd.set_option("display.max_rows", None)
@@ -177,6 +179,12 @@ fig, (ax1, ax2, ax3) = plt.subplots(
     3, sharex=True, gridspec_kw={"height_ratios": [2, 1, 1]}
 )
 fig.set_size_inches(12, 10)
+
+# Add information text box
+info_text = f"Filter window: {window_size}"
+anchored_text = AnchoredText(info_text, loc="upper left", prop=dict(size=8), frameon=False)
+anchored_text.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+ax2.add_artist(anchored_text)
 
 color_dict = {"Red": "green", "Green": "red"}
 
