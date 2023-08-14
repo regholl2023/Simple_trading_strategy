@@ -105,7 +105,7 @@ data["close_detrend_norm"] = data["close_detrend"] / max(
 )
 
 if args.window is None or args.window == 0:
-    args.window = round(args.ndays // 10)
+    args.window = round(args.ndays // 14.40)
     if (args.window % 2) == 0:
         args.window += 1
 
