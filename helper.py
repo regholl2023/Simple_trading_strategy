@@ -66,11 +66,14 @@ def compute_actions(symbol, data, end_date):
     if last_action:
         rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
         days_ago = (end_date - last_action_date.date()).days
+        last_price = data["c"].iloc[-1]
+        percent_change = ( ( last_action_price - last_price ) / last_action_price ) * 100.0
         action_msg = (
             f'{symbol:5s} last action was {last_action:4s} on '
             f'{last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, '
             f'or {rows_from_end:4d} trading-days ago) at a price of '
-            f'{last_action_price:8.3f} last price {data["close"].iloc[-1]:8.3f}'
+            f'{last_action_price:8.3f} last price {last_price:8.3f} '
+            f'percent change {percent_change:9.3f}'
         )
         print(action_msg)
     else:

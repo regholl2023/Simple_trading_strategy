@@ -132,7 +132,7 @@ class ActionComputer:
         )
         last_sell_date = (
             sell_actions.index[-1] if not sell_actions.empty else None
-        )
+        ) 
         if last_buy_date and last_sell_date:
             if last_buy_date > last_sell_date:
                 last_action = "Buy"
@@ -167,8 +167,10 @@ class ActionComputer:
             end_date_object = datetime.strptime(end_date, "%Y-%m-%d")
             date_object = datetime.strptime(date_string, "%Y-%m-%d")
             days_ago = (end_date_object - date_object).days
+            last_price = data["c"].iloc[-1]
+            percent_change = ( ( last_action_price - last_price ) / last_action_price ) * 100.0
             print(
-                f'{symbol:5s} last action was {last_action:4s} on {date_string} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {data["c"].iloc[-1]:8.3f}'
+                    f'{symbol:5s} last action was {last_action:4s} on {date_string} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {last_price:8.3f} percent change {percent_change:9.3f}'
             )
         else:
             print("No Buy or Sell actions were recorded.")
