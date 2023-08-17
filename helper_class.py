@@ -94,7 +94,7 @@ class ActionComputer:
             )
             days_ago = (end_date - last_action_date.date()).days
             last_price = data["close"].iloc[-1]
-            percent_change = ( ( last_action_price - last_price ) / last_action_price ) * 100.0
+            percent_change = ( ( last_price - last_action_price ) / last_action_price ) * 100.0
             print(
                 f'{symbol:5s} last action was {last_action:4s} on {last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {last_price:8.3f} percent change {percent_change:9.3f}'
             )

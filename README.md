@@ -52,7 +52,7 @@ Here is AAPL at a later time:
 
 ![Example_plot_display](images/Figure_2.png)
 
-AAPL  last action was Sell on 2023-07-20 (  28 days ago, or   20 trading-days ago) at a price of  193.130 last price  174.010 percent change     9.900
+AAPL  last action was Sell on 2023-07-20 (  28 days ago, or   20 trading-days ago) at a price of  193.130 last price  173.770 percent change   -10.024
 
 ## License
 

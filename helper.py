@@ -67,7 +67,7 @@ def compute_actions(symbol, data, end_date):
         rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
         days_ago = (end_date - last_action_date.date()).days
         last_price = data["close"].iloc[-1]
-        percent_change = ( ( last_action_price - last_price ) / last_action_price ) * 100.0
+        percent_change = ( ( last_price - last_action_price ) / last_action_price ) * 100.0
         action_msg = (
             f'{symbol:5s} last action was {last_action:4s} on '
             f'{last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, '
