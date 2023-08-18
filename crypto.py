@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import pandas_market_calendars as mcal
 
 from scipy import signal
-from datetime import date, timedelta
 from alpaca_trade_api.rest import TimeFrame
 from matplotlib.offsetbox import AnchoredText
-from helper_class import DataConfig, DataFetcher, ActionComputer, DataPlotter
+from datetime import date, timedelta, datetime
+from crypto_helper import DataConfig, DataFetcher, ActionComputer, DataPlotter
 
 pd.set_option("display.max_rows", None)
 pd.set_option("display.max_columns", None)
@@ -70,6 +70,7 @@ TIMEFRAME = TimeFrame.Minute if args.timeframe == "Minute" else TimeFrame.Day
 
 # Get today's date
 END_DATE = date.today()
+END_DATE = datetime.combine(END_DATE, datetime.min.time())
 
 # Get the NYSE trading calendar
 NYSE = mcal.get_calendar("NYSE")
@@ -78,6 +79,9 @@ NYSE = mcal.get_calendar("NYSE")
 START_DATE = NYSE.valid_days(
     start_date=END_DATE - timedelta(days=2 * args.ndays), end_date=END_DATE
 )[-args.ndays]
+
+# Convert to Python datetime object if needed
+START_DATE = pd.Timestamp(START_DATE).to_pydatetime()
 
 # Convert symbol to upper case
 SYMBOL = args.symbol.upper()
@@ -88,7 +92,7 @@ DATA_CONFIG = DataConfig(SYMBOL, TIMEFRAME, START_DATE, END_DATE, args.ndays)
 # Pass the DataConfig instance to the DataFetcher constructor
 DATA_FETCHER = DataFetcher(DATA_CONFIG)
 
-CURRENT_PRICE, data = DATA_FETCHER.fetch_data()
+CURRENT_PRICE, data = DATA_FETCHER.fetch_crypto_data()
 
 # Create linear trend line
 x = np.linspace(0, len(data.index) - 1, len(data.index))

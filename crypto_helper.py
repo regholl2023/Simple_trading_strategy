@@ -3,8 +3,12 @@
 import os
 import subprocess
 import pandas as pd
-from alpaca_trade_api.rest import REST
 
+from datetime import datetime
+from alpaca_trade_api.rest import REST
+from alpaca.data.timeframe import TimeFrame
+from alpaca.data.requests import CryptoBarsRequest
+from alpaca.data.historical import CryptoHistoricalDataClient
 
 class DataConfig:
     """Class to hold data configuration."""
@@ -14,6 +18,14 @@ class DataConfig:
         self.timeframe = timeframe
         self.start_date = start_date
         self.end_date = end_date
+        if isinstance(start_date, str):
+            self.start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        else:
+            self.start_date = start_date
+        if isinstance(end_date, str):
+            self.end_date = datetime.strptime(end_date, '%Y-%m-%d')
+        else:
+            self.end_date = end_date
         self.ndays = ndays
 
 
@@ -25,6 +37,33 @@ class DataFetcher:
         self.api_key = os.getenv("APCA_API_KEY_ID")
         self.api_secret = os.getenv("APCA_API_SECRET_KEY")
         self.api = REST(self.api_key, self.api_secret)
+
+    def fetch_crypto_data(self):
+        """Fetch cryptocurrency market data."""
+
+        # no keys required for crypto data
+        client = CryptoHistoricalDataClient()
+
+        request_params = CryptoBarsRequest(
+                            symbol_or_symbols=self.config.symbol,
+                            # timeframe=self.config.timeframe,
+                            timeframe=TimeFrame.Day,
+                            start=self.config.start_date,
+                            end=self.config.end_date,
+                     )
+
+        df = client.get_crypto_bars(request_params).df
+
+        # Reset the index to bring 'symbol' and 'timestamp' into columns
+        df.reset_index(inplace=True)
+
+        # Select only the 'close' and 'timestamp' columns and rename 'timestamp' to 'DateTime'
+        df = df[['close', 'timestamp']]
+        df.rename(columns={'timestamp': 'DateTime'}, inplace=True)
+
+        current_price = df['close'].iloc[-1]
+
+        return current_price, df
 
     def fetch_data(self):
         """Fetch stock market data."""
@@ -51,7 +90,6 @@ class DataFetcher:
             )
         data["DateTime"] = data.index
         data.reset_index(drop=True, inplace=True)
-
         return current_price, data
 
 
@@ -93,7 +131,7 @@ class ActionComputer:
             rows_from_end = (
                 len(data) - data.index.get_loc(last_action_date) - 1
             )
-            days_ago = (end_date - last_action_date.date()).days
+            days_ago = (end_date.date() - last_action_date.date()).days
             last_price = data["close"].iloc[-1]
             percent_change = ( ( last_price - last_action_price ) / last_action_price ) * 100.0
             print(

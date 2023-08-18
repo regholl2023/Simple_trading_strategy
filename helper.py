@@ -142,26 +142,27 @@ def plot_detrended_data(data, args, ax2):
     ax2.legend()
 
 def plot_z_score_velocity(data, args, ax3):
-    """
-    Plots the z-score of the filtered velocity.
-    """
-    ax3.plot(data.index, data["zscore_velocity"], color="blue")
+    """Plot z-score velocity."""
+    x_values = data.index.to_numpy() # Convert the index to a numpy array
+    y_values = data["zscore_velocity"].to_numpy()  # Convert to a numpy array
+    ax3.plot(x_values, y_values, color="blue")
+    # ax3.plot(data.index, data["zscore_velocity"], color="blue")
     ax3.axhline(0, color="black", linewidth=1)
     ax3.axhline(args.std_dev, color="black", linewidth=1, linestyle="--")
     ax3.axhline(-args.std_dev, color="black", linewidth=1, linestyle="--")
     ax3.fill_between(
         data.index,
-        data["zscore_velocity"],
+        y_values, # use the numpy array here
         args.std_dev,
-        where=data["zscore_velocity"] > args.std_dev,
+        where=y_values > args.std_dev, # use the numpy array here
         facecolor="red",
         alpha=0.3,
     )
     ax3.fill_between(
         data.index,
-        data["zscore_velocity"],
+        y_values, # use the numpy array here
         -args.std_dev,
-        where=data["zscore_velocity"] < -args.std_dev,
+        where=y_values < -args.std_dev, # use the numpy array here
         facecolor="green",
         alpha=0.3,
     )
