@@ -111,7 +111,7 @@ class DataFetcher:
                     )
                     df = df.append(new_row, ignore_index=True)
 
-                df = df[-self.ndays :]
+                df = df[-self.ndays:]
                 data = data.append(df)
 
             # If there's a next_page_token, update the page_token and continue the loop

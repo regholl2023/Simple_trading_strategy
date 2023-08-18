@@ -105,7 +105,10 @@ data["close_detrend_norm"] = data["close_detrend"] / max(
 )
 
 if args.window is None or args.window == 0:
-    args.window = round(args.ndays // 14.40)
+    if args.timeframe == 'Minute':
+        args.window = round(data.shape[0] // 8.17)
+    else:
+        args.window = round(data.shape[0] // 14.40)
     if (args.window % 2) == 0:
         args.window += 1
 
@@ -172,7 +175,7 @@ for i in range(
 data.set_index("DateTime", inplace=True)
 
 # Compute last action and print important information
-ActionComputer.compute_actions(SYMBOL, data, END_DATE)
+ActionComputer.compute_actions(SYMBOL, data, END_DATE, args.timeframe)
 
 data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(
     abs(data["close_detrend"])
@@ -192,10 +195,10 @@ ax2.add_artist(anchored_text)
 
 color_dict = {"Red": "green", "Green": "red"}
 
-DataPlotter.plot_close_price(data, SYMBOL, ax1, color_dict)
-DataPlotter.plot_detrended_data(data, args, ax2)
+DataPlotter.plot_close_price(data, SYMBOL, ax1, color_dict, args.timeframe)
+DataPlotter.plot_detrended_data(data, args, ax2, args.timeframe)
 DataPlotter.plot_z_score_velocity(data, args, ax3)
-DataPlotter.plot_buy_sell_markers(data, ax1, ax2)
+DataPlotter.plot_buy_sell_markers(data, ax1, ax2, args.timeframe)
 
 plt.tight_layout()
 plt.show()
