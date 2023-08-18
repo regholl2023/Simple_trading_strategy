@@ -63,6 +63,12 @@ parser.add_argument(
     choices=["Day", "Minute"],
     default="Day",
 )
+parser.add_argument(
+    "-ns", "--num_samples",
+    help="Number of samples",
+    type=int,
+    default=5000,
+)
 args = parser.parse_args()
 
 # Define the time frame
@@ -83,7 +89,7 @@ START_DATE = NYSE.valid_days(
 SYMBOL = args.symbol.upper()
 
 # Create a DataConfig instance with all necessary parameters
-DATA_CONFIG = DataConfig(SYMBOL, TIMEFRAME, START_DATE, END_DATE, args.ndays)
+DATA_CONFIG = DataConfig(SYMBOL, TIMEFRAME, START_DATE, END_DATE, args.ndays, args.timeframe, args.num_samples)
 
 # Pass the DataConfig instance to the DataFetcher constructor
 DATA_FETCHER = DataFetcher(DATA_CONFIG)
@@ -144,9 +150,10 @@ data["Action"] = ""
 LAST_RED = None
 LAST_GREEN = None
 
-for i in range(
-    1, len(data)
-):  # start from the second row since we are checking with the previous row
+first = int(data.index[0]+1)
+last = int(data.index[-1])
+
+for i in range(first, last):
     # Update LAST_RED or LAST_GREEN
     if data.loc[i - 1, "Color"] == "Red":
         LAST_RED = i - 1

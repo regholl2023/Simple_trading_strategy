@@ -11,12 +11,14 @@ from alpaca_trade_api.rest import REST
 class DataConfig:
     """Class to hold data configuration."""
 
-    def __init__(self, symbol, timeframe, start_date, end_date, ndays):
+    def __init__(self, symbol, timeframe, start_date, end_date, ndays, sample_rate, num_samples):
         self.symbol = symbol
         self.timeframe = timeframe
         self.start_date = start_date
         self.end_date = end_date
         self.ndays = ndays
+        self.sample_rate = sample_rate
+        self.ns = num_samples
 
 
 class DataFetcher:
@@ -53,6 +55,11 @@ class DataFetcher:
             )
         data["DateTime"] = data.index
         data.reset_index(drop=True, inplace=True)
+
+        if self.config.sample_rate == 'Minute':
+            data = data[-self.config.ns:]
+        else:
+            data = data[-self.config.ndays:]
 
         return current_price, data
 

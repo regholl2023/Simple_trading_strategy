@@ -66,6 +66,12 @@ parser.add_argument(
     choices=["Day", "Minute"],
     default="Day",
 )
+parser.add_argument(
+    "-ns", "--num_samples",
+    help="Number of samples",
+    type=int,
+    default=5000,
+)
 args = parser.parse_args()
 
 # Read symbols from file
@@ -75,13 +81,16 @@ with open(args.list, "r") as file:
 # Define the time frame
 timeframe = TimeFrame.Minute if args.timeframe == "Minute" else TimeFrame.Day
 
-data_fetcher = DataFetcher(symbols, timeframe, args.ndays)
+data_fetcher = DataFetcher(symbols, timeframe, args.ndays, args.num_samples, args.timeframe)
 df, end_date = data_fetcher.fetch_historical_data_v2()
 
 data = pd.DataFrame()
 
 for symbol in symbols:
-    symbol_data = df[df["symbol"] == symbol][-args.ndays :].copy()
+    if args.timeframe == 'Day':
+        symbol_data = df[df["symbol"] == symbol][-args.ndays :].copy()
+    else:
+        symbol_data = df[df["symbol"] == symbol][-args.num_samples :].copy()
     symbol_data["t"] = pd.to_datetime(symbol_data["t"])
     symbol_data = symbol_data.sort_values(by="t")
     symbol_data.reset_index(drop=True, inplace=True)
@@ -104,7 +113,10 @@ for symbol in symbols:
     )
 
     if args.window is None or args.window == 0:
-        args.window = round(args.ndays // 14.40)
+        if args.timeframe == 'Minute':
+            args.window = round(data.shape[0] // 8.17)
+        else:
+            args.window = round(data.shape[0] // 14.40)
         if (args.window % 2) == 0:
             args.window += 1
 
@@ -175,4 +187,4 @@ for symbol in symbols:
     symbol_data.set_index("t", inplace=True)
 
     # Compute last action and print important information
-    ActionComputer.compute_actions(symbol, symbol_data, end_date)
+    ActionComputer.compute_actions(symbol, symbol_data, end_date, args.timeframe)

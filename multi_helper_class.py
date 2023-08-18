@@ -11,13 +11,15 @@ from alpaca_trade_api.rest import REST
 
 
 class DataFetcher:
-    def __init__(self, symbols, timeframe, ndays):
+    def __init__(self, symbols, timeframe, ndays, num_samples, sample_rate):
         self.symbols = symbols
         self.timeframe = timeframe
         self.ndays = ndays
         self.api_key = os.getenv("APCA_API_KEY_ID")
         self.api_secret = os.getenv("APCA_API_SECRET_KEY")
         self.api = REST(self.api_key, self.api_secret)
+        self.ns = num_samples
+        self.sample_rate = sample_rate
 
     def calculate_start_date(self):
         nyse = mcal.get_calendar("NYSE")
@@ -111,7 +113,10 @@ class DataFetcher:
                     )
                     df = df.append(new_row, ignore_index=True)
 
-                df = df[-self.ndays:]
+                if self.sample_rate == 'Day':
+                    df = df[-self.ndays:]
+                else:
+                    df = df[-self.ns:]
                 data = data.append(df)
 
             # If there's a next_page_token, update the page_token and continue the loop
@@ -124,7 +129,7 @@ class DataFetcher:
 
 class ActionComputer:
     @staticmethod
-    def compute_actions(symbol, data, end_date):
+    def compute_actions(symbol, data, end_date, timeframe):
         buy_actions = data[data["Action"] == "Buy"]
         sell_actions = data[data["Action"] == "Sell"]
         last_buy_date = (
@@ -154,23 +159,39 @@ class ActionComputer:
             last_action = None
 
         if last_action:
-            rows_from_end = (
-                len(data) - data.index.get_loc(last_action_date) - 1
-            )
-            if isinstance(last_action_date, str):
-                date_object = datetime.strptime(
-                    last_action_date, "%Y-%m-%dT%H:%M:%SZ"
+            last_price = data["c"].iloc[-1]
+            percent_change = (last_price - last_action_price) / last_action_price * 100.0
+            if timeframe == 'Day':
+                rows_from_end = (
+                    len(data) - data.index.get_loc(last_action_date) - 1
+                )
+                if isinstance(last_action_date, str):
+                    date_object = datetime.strptime(
+                        last_action_date, "%Y-%m-%dT%H:%M:%SZ"
+                    )
+                else:
+                    date_object = last_action_date.to_pydatetime()
+
+                date_string = date_object.strftime("%Y-%m-%d")
+                end_date_object = datetime.strptime(end_date, "%Y-%m-%d")
+                date_object = datetime.strptime(date_string, "%Y-%m-%d")
+
+                df_with_row_number = data.reset_index()
+                print(
+                    f'{symbol:5s} last action was {last_action:4s} on '
+                    f'{last_action_date.strftime("%Y-%m-%d")} '
+                    f'({rows_from_end:4d} trading-days ago) at a '
+                    f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
+                    f'percent change {percent_change:9.3f}'
                 )
             else:
-                date_object = last_action_date.to_pydatetime()
-            date_string = date_object.strftime("%Y-%m-%d")
-            end_date_object = datetime.strptime(end_date, "%Y-%m-%d")
-            date_object = datetime.strptime(date_string, "%Y-%m-%d")
-            days_ago = (end_date_object - date_object).days
-            last_price = data["c"].iloc[-1]
-            percent_change = ( ( last_price - last_action_price ) / last_action_price ) * 100.0
-            print(
-                    f'{symbol:5s} last action was {last_action:4s} on {date_string} ({days_ago:4d} days ago, or {rows_from_end:4d} trading-days ago) at a price of {last_action_price:8.3f} last price {last_price:8.3f} percent change {percent_change:9.3f}'
-            )
+                rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
+                print(
+                    f'{symbol:5s} last action was {last_action:4s} on '
+                    f'{last_action_date.strftime("%Y-%m-%d:%H:%M")} '
+                    f'({rows_from_end:5d} samples ago) at a '
+                    f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
+                    f'percent change {percent_change:9.3f}'
+                )
         else:
             print("No Buy or Sell actions were recorded.")
