@@ -87,6 +87,12 @@ parser.add_argument(
     choices=["Day", "Minute"],
     default="Day",
 )
+parser.add_argument(
+    "-ns", "--num_samples",
+    help="Number of samples",
+    type=int,
+    default=5000,
+)
 args = parser.parse_args()
 
 # Define the time frame
@@ -111,7 +117,7 @@ API_KEY = os.getenv("APCA_API_KEY_ID")
 API_SECRET = os.getenv("APCA_API_SECRET_KEY")
 
 # Fetch OHLC data using the fetch_data function from helper.py
-CURRENT_PRICE, DATA = fetch_data(SYMBOL, TIMEFRAME, START_DATE, END_DATE)
+CURRENT_PRICE, DATA = fetch_data(SYMBOL, TIMEFRAME, START_DATE, END_DATE, args.ndays, args.timeframe, args.num_samples)
 
 # Create linear trend line
 X_VALUES = np.linspace(0, len(DATA.index) - 1, len(DATA.index))
@@ -128,7 +134,10 @@ DATA["close_detrend_norm"] = DATA["close_detrend"] / max(
 )
 
 if args.window is None or args.window == 0:
-    args.window = round(args.ndays // 14.40)
+    if args.timeframe == 'Minute':
+        args.window = round(DATA.shape[0] // 8.17)
+    else:
+        args.window = round(DATA.shape[0] // 14.40)
     if (args.window % 2) == 0:
         args.window += 1
 
@@ -166,7 +175,10 @@ DATA["Action"] = ""
 LAST_RED = None
 LAST_GREEN = None
 
-for i in range(1, len(DATA)):
+first = int(DATA.index[0]+1)
+last = int(DATA.index[-1])
+
+for i in range(first, last):
     # Update LAST_RED or LAST_GREEN
     if DATA.loc[i - 1, "Color"] == "Red":
         LAST_RED = i - 1
@@ -197,7 +209,7 @@ for i in range(1, len(DATA)):
 DATA.set_index("DateTime", inplace=True)
 
 # Compute last action and print important information
-compute_actions(SYMBOL, DATA, END_DATE)
+compute_actions(SYMBOL, DATA, END_DATE, args.timeframe)
 
 DATA["close_detrend_norm_filt_adj"] = DATA["close_detrend_norm_filt"] * max(
     abs(DATA["close_detrend"])
@@ -211,16 +223,16 @@ FIG.set_size_inches(12, 10)
 
 # Add information text box
 info_text = f"Filter window: {WINDOW_SIZE}"
-anchored_text = AnchoredText(info_text, loc="upper left", prop=dict(size=8), frameon=False)
+anchored_text = AnchoredText(info_text, loc="lower left", prop=dict(size=8), frameon=False)
 anchored_text.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-AX2.add_artist(anchored_text)
+AX3.add_artist(anchored_text)
 
 COLOR_DICT = {"Red": "green", "Green": "red"}
 
-plot_close_price(DATA, SYMBOL, AX1, COLOR_DICT)
-plot_detrended_data(DATA, args, AX2)
+plot_close_price(DATA, SYMBOL, AX1, COLOR_DICT, args.timeframe)
+plot_detrended_data(DATA, args, AX2, args.timeframe)
 plot_z_score_velocity(DATA, args, AX3)
-plot_buy_sell_markers(DATA, AX1, AX2)
+plot_buy_sell_markers(DATA, AX1, AX2, args.timeframe)
 
 plt.tight_layout()
 plt.show()

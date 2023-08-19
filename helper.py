@@ -7,7 +7,7 @@ import subprocess
 from alpaca_trade_api.rest import REST
 import pandas as pd
 
-def fetch_data(symbol, timeframe, start_date, end_date):
+def fetch_data(symbol, timeframe, start_date, end_date, ndays, sample_rate, num_samples):
     """
     Fetches financial data for the given symbol and timeframe.
     """
@@ -33,9 +33,13 @@ def fetch_data(symbol, timeframe, start_date, end_date):
         data = data.append(pd.DataFrame({"close": current_price}, index=[end_date_tz]))
     data["DateTime"] = data.index
     data.reset_index(drop=True, inplace=True)
+    if sample_rate == 'Minute':
+        data = data[-num_samples:]
+    else:
+        data = data[-ndays:]
     return current_price, data
 
-def compute_actions(symbol, data, end_date):
+def compute_actions(symbol, data, end_date, timeframe):
     """
     Computes and prints the most recent action (Buy/Sell) for the given data.
     """
@@ -65,77 +69,142 @@ def compute_actions(symbol, data, end_date):
 
     if last_action:
         rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
-        days_ago = (end_date - last_action_date.date()).days
         last_price = data["close"].iloc[-1]
-        percent_change = ( ( last_price - last_action_price ) / last_action_price ) * 100.0
-        action_msg = (
-            f'{symbol:5s} last action was {last_action:4s} on '
-            f'{last_action_date.strftime("%Y-%m-%d")} ({days_ago:4d} days ago, '
-            f'or {rows_from_end:4d} trading-days ago) at a price of '
-            f'{last_action_price:8.3f} last price {last_price:8.3f} '
-            f'percent change {percent_change:9.3f}'
-        )
-        print(action_msg)
+        percent_change = (last_price - last_action_price) / last_action_price * 100.0
+        if timeframe == "Minute":
+            print(
+                f'{symbol:5s} last action was {last_action:4s} on '
+                f'{last_action_date.strftime("%Y-%m-%d:%H:%M")} '
+                f'({rows_from_end:5d} samples ago) at a '
+                f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
+                f'percent change {percent_change:9.3f}'
+            )
+        else:
+            df_with_row_number = data.reset_index()
+            print(
+                f'{symbol:5s} last action was {last_action:4s} on '
+                f'{last_action_date.strftime("%Y-%m-%d")} '
+                f'({rows_from_end:4d} trading-days ago) at a '
+                f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
+                f'percent change {percent_change:9.3f}'
+            )
     else:
         print("No Buy or Sell actions were recorded.")
 
-def plot_close_price(data, symbol, ax1, color_dict):
-    """
-    Plots the close price and filtered close price.
-    """
-    data["close"].plot(
-        ax=ax1,
-        grid=True,
-        title=f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} to '
-        f'{data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}',
+def get_company_name(symbol_namespace):
+    """Get company name by symbol."""
+    symbol = symbol_namespace.symbol.upper()
+    file_path = "tickers.txt"
+    command = f"awk -F '|' '$1 == \"{symbol}\" {{print $2}}' {file_path}"
+    result = subprocess.run(
+        command, stdout=subprocess.PIPE, shell=True, text=True, check=True
     )
-    data["close_detrend_norm_filt_adj"].plot(
-        ax=ax1, grid=True, color="black", label="Filtered Close Price"
+    return result.stdout.strip() or ""
+
+def plot_close_price(data, symbol, ax1, color_dict, timeframe):
+    """Plot close price."""
+
+    x_values = (
+        range(len(data))
+        if timeframe == "Minute"
+        else data.index.to_numpy()
     )
+    y_values = data["close"].to_numpy()
+
+    ax1.plot(x_values, y_values)
+
+    ax1.set_title(
+        f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} '
+        f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}'
+    )
+
+    y_values_filtered = data[
+        "close_detrend_norm_filt_adj"
+    ].to_numpy()
+    ax1.plot(
+        x_values,
+        y_values_filtered,
+        color="black",
+        label="Filtered Close Price",
+    )
+
     previous_row = data.iloc[0]
-    for i, row in data.iloc[1:].iterrows():
-        segment_color = color_dict.get(row["Color"], "black")
-        ax1.plot(
-            [previous_row.name, i],
-            [
-                previous_row["close_detrend_norm_filt_adj"],
-                row["close_detrend_norm_filt_adj"],
-            ],
-            color=segment_color,
-            alpha=0.12,
-            linewidth=7.0,
+    if timeframe == "Minute":
+        for i, row in enumerate(data.iloc[1:].iterrows()):
+            index, row_data = row
+            segment_color = color_dict.get(row_data["Color"], "black")
+            ax1.plot(
+                [i, i + 1],
+                [
+                    previous_row["close_detrend_norm_filt_adj"],
+                    row_data["close_detrend_norm_filt_adj"],
+                ],
+                color=segment_color,
+                alpha=0.075,
+                linewidth=7.0,
+            )
+            previous_row = row_data
+    else:
+        for i, (index, row_data) in enumerate(data.iloc[1:].iterrows()):
+            segment_color = color_dict.get(row_data["Color"], "black")
+            ax1.plot(
+                [data.index[i], data.index[i + 1]],
+                [
+                    previous_row["close_detrend_norm_filt_adj"],
+                    row_data["close_detrend_norm_filt_adj"],
+                ],
+                color=segment_color,
+                alpha=0.15,
+                linewidth=7.0,
+            )
+            previous_row = row_data
+
+    if timeframe == "Minute":
+        ax1.set_xticks(x_values[:: len(data) // 10])
+        ax1.set_xticklabels(
+            data.index[:: len(data) // 10].strftime("%Y-%m-%d %H:%M"),
+            rotation=45,
         )
-        previous_row = row
+
     ax1.set_ylabel("Price")
     ax1.grid(color="lightgrey")
     ax1.legend()
 
-def get_company_name(symbol_namespace):
-    """
-    Retrieves the company name for the given symbol namespace.
-    """
-    symbol = symbol_namespace.symbol.upper()
-    file_path = 'tickers.txt'
-    command = f"awk -F '|' '$1 == \"{symbol}\" {{print $2}}' {file_path}"
-    result = subprocess.run(command, stdout=subprocess.PIPE, shell=True, text=True, check=True)
-    return result.stdout.strip() or ''
+def plot_detrended_data(data, symbol, ax2, timeframe):
+    """Plot detrended data."""
 
-def plot_detrended_data(data, args, ax2):
-    """
-    Plots the detrended and normalized close price and the filtered data.
-    """
-    company_name = get_company_name(args)
+    x_values = (
+        range(len(data))
+        if timeframe == "Minute"
+        else data.index.to_numpy()
+    )
+    y_values_detrend_norm = data["close_detrend_norm"].to_numpy()
+    y_values_detrend_norm_filt = data[
+        "close_detrend_norm_filt"
+    ].to_numpy()
+
+    company_name = get_company_name(symbol)
     title = (
         f"Detrended and Normalized Close Price for {company_name}"
         if company_name
         else "Detrended and Normalized Close Price"
     )
-    data["close_detrend_norm"].plot(
-        ax=ax2, grid=True, title=title, label="Detrended and Normalized"
+
+    ax2.plot(
+        x_values, y_values_detrend_norm, label="Detrended and Normalized"
     )
-    data["close_detrend_norm_filt"].plot(
-        ax=ax2, grid=True, label="Low-pass Filtered"
+    ax2.plot(
+        x_values, y_values_detrend_norm_filt, label="Low-pass Filtered"
     )
+
+    if timeframe == "Minute":
+        ax2.set_xticks(x_values[:: len(data) // 10])
+        ax2.set_xticklabels(
+            data.index[:: len(data) // 10].strftime("%Y-%m-%d"),
+            rotation=45,
+        )
+
+    ax2.set_title(title)
     ax2.set_xlabel("Date")
     ax2.set_ylabel("Normalized and Filtered Price")
     ax2.grid(color="lightgrey")
@@ -143,43 +212,60 @@ def plot_detrended_data(data, args, ax2):
 
 def plot_z_score_velocity(data, args, ax3):
     """Plot z-score velocity."""
-    x_values = data.index.to_numpy() # Convert the index to a numpy array
-    y_values = data["zscore_velocity"].to_numpy()  # Convert to a numpy array
+
+    x_values = range(len(data)) if args.timeframe == 'Minute' else data.index.to_numpy()
+
+    y_values = data["zscore_velocity"].to_numpy()
+
     ax3.plot(x_values, y_values, color="blue")
-    # ax3.plot(data.index, data["zscore_velocity"], color="blue")
     ax3.axhline(0, color="black", linewidth=1)
     ax3.axhline(args.std_dev, color="black", linewidth=1, linestyle="--")
     ax3.axhline(-args.std_dev, color="black", linewidth=1, linestyle="--")
     ax3.fill_between(
-        data.index,
-        y_values, # use the numpy array here
+        x_values,
+        y_values,
         args.std_dev,
-        where=y_values > args.std_dev, # use the numpy array here
+        where=y_values > args.std_dev,
         facecolor="red",
         alpha=0.3,
     )
     ax3.fill_between(
-        data.index,
-        y_values, # use the numpy array here
+        x_values,
+        y_values,
         -args.std_dev,
-        where=y_values < -args.std_dev, # use the numpy array here
+        where=y_values < -args.std_dev,
         facecolor="green",
         alpha=0.3,
     )
+
+    if args.timeframe == 'Minute':
+        ax3.set_xticks(x_values[::len(data)//10])
+        ax3.set_xticklabels(data.index[::len(data)//10].strftime("%Y-%m-%d %H:%M"), rotation=45)
+
     ax3.set_xlabel("Date")
     ax3.set_ylabel("Filtered Velocity (Z-score)")
     ax3.set_title("Z-score of Filtered Velocity")
     ax3.grid(color="lightgrey")
 
-def plot_buy_sell_markers(data, ax1, ax2):
-    """
-    Plots buy and sell markers.
-    """
+def plot_buy_sell_markers(data, ax1, ax2, timeframe):
+    """Plot buy/sell markers."""
     marker_size = 100
     buy_actions = data[data["Action"] == "Buy"]
     sell_actions = data[data["Action"] == "Sell"]
+
+    x_values_buy = (
+        [list(data.index).index(idx) for idx in buy_actions.index]
+        if timeframe == "Minute"
+        else buy_actions.index.to_numpy()
+    )
+    x_values_sell = (
+        [list(data.index).index(idx) for idx in sell_actions.index]
+        if timeframe == "Minute"
+        else sell_actions.index.to_numpy()
+    )
+
     ax2.scatter(
-        buy_actions.index,
+        x_values_buy,
         buy_actions["close_detrend_norm"],
         color="green",
         marker="^",
@@ -187,7 +273,7 @@ def plot_buy_sell_markers(data, ax1, ax2):
         s=marker_size,
     )
     ax2.scatter(
-        sell_actions.index,
+        x_values_sell,
         sell_actions["close_detrend_norm"],
         color="red",
         marker="v",
@@ -196,27 +282,38 @@ def plot_buy_sell_markers(data, ax1, ax2):
     )
     y_min, y_max = ax1.get_ylim()
     offset = (y_max - y_min) * 0.05
-    for buy_date, buy_data in buy_actions.iterrows():
+    for buy_x, buy_data in zip(x_values_buy, buy_actions.itertuples()):
         ax1.scatter(
-            buy_date, buy_data["close"], color="green", marker="^", label="Buy", s=marker_size
+            buy_x,
+            buy_data.close,
+            color="green",
+            marker="^",
+            label="Buy",
+            s=marker_size,
         )
         ax1.text(
-            buy_date,
-            buy_data["close"] - offset,
-            f'Buy: {buy_data["close"]:.2f}',
+            buy_x,
+            buy_data.close - offset,
+            f"Buy: {buy_data.close:.2f}",
             color="green",
             verticalalignment="top",
             horizontalalignment="center",
         )
-
-    for sell_date, sell_data in sell_actions.iterrows():
+    for sell_x, sell_data in zip(
+        x_values_sell, sell_actions.itertuples()
+    ):
         ax1.scatter(
-            sell_date, sell_data["close"], color="red", marker="v", label="Sell", s=marker_size
+            sell_x,
+            sell_data.close,
+            color="red",
+            marker="v",
+            label="Sell",
+            s=marker_size,
         )
         ax1.text(
-            sell_date,
-            sell_data["close"] + offset,
-            f'Sell: {sell_data["close"]:.2f}',
+            sell_x,
+            sell_data.close + offset,
+            f"Sell: {sell_data.close:.2f}",
             color="red",
             verticalalignment="bottom",
             horizontalalignment="center",

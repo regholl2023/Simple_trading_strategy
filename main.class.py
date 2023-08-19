@@ -196,9 +196,9 @@ fig.set_size_inches(12, 10)
 
 # Add information text box
 info_text = f"Filter window: {window_size}"
-anchored_text = AnchoredText(info_text, loc="upper left", prop=dict(size=8), frameon=False)
+anchored_text = AnchoredText(info_text, loc="lower left", prop=dict(size=10), frameon=False)
 anchored_text.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-ax2.add_artist(anchored_text)
+ax3.add_artist(anchored_text)
 
 color_dict = {"Red": "green", "Green": "red"}
 
