@@ -48,6 +48,8 @@ python main.py -s AAPL -n 504 -w 31 -sd 0.01 -t Day
 
 ![Initial_day_plot](images/Figure_1.png)
 
+AAPL  last action was Sell on 2023-07-07 (   1 trading-days ago) at a price of  190.680 last price  188.610 percent change    -1.086
+
 Here is AAPL at a later time with the same command-line parameters:
 
 ![Updated_day_plot](images/Figure_2.png)

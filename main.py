@@ -109,6 +109,15 @@ START_DATE = NYSE.valid_days(
     start_date=END_DATE - timedelta(days=2 * args.ndays), end_date=END_DATE
 )[-args.ndays]
 
+'''
+# For testing specific dates 
+start_date = "2021-07-08"
+START_DATE=pd.Timestamp(start_date).date()
+end_date = "2023-07-10"
+from datetime import datetime
+END_DATE = datetime.strptime(end_date, "%Y-%m-%d").date()
+'''
+
 # Convert symbol to upper case
 SYMBOL = args.symbol.upper()
 

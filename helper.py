@@ -23,6 +23,11 @@ def fetch_data(symbol, timeframe, start_date, end_date, ndays, sample_rate, num_
     ).df
     data = pd.DataFrame(data_frame["close"])
     data.index = pd.to_datetime(data.index)
+
+    # for testing specific dates
+    # current_price = data["close"].iloc[-1]
+
+    # comment this section out for testing specific dates
     current_price = api.get_latest_trade(symbol).price
     last_date_in_data = data.index[-1].date()
     end_date_tz = pd.Timestamp(end_date).tz_localize(data.index.tz)
@@ -31,6 +36,7 @@ def fetch_data(symbol, timeframe, start_date, end_date, ndays, sample_rate, num_
             data.iloc[-1, 0] = current_price
     else:
         data = data.append(pd.DataFrame({"close": current_price}, index=[end_date_tz]))
+
     data["DateTime"] = data.index
     data.reset_index(drop=True, inplace=True)
     if sample_rate == 'Minute':
