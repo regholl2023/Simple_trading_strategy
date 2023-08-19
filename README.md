@@ -46,13 +46,34 @@ python main.py -s AAPL -n 504 -w 31 -sd 0.01 -t Day
 python main.py -s AAPL -n 504 -w 31 -sd 0.01 -t Day
 ```
 
-![Example_plot_display](images/Figure_1.png)
+![Initial_day_plot](images/Figure_1.png)
 
-Here is AAPL at a later time:
+Here is AAPL at a later time with the same command-line parameters:
 
-![Example_plot_display](images/Figure_2.png)
+![Updated_day_plot](images/Figure_2.png)
 
-AAPL  last action was Sell on 2023-07-20 (  28 days ago, or   20 trading-days ago) at a price of  193.130 last price  173.770 percent change   -10.024
+AAPL  last action was Sell on 2023-07-20 (  20 trading-days ago) at a price of  193.130 last price  173.770 percent change   -10.024
+
+- Fetch and analyze 504 trading days of STRL stock data with a default Hanning filter window size and a z-score threshold of 0.01:
+
+```
+python main.class.py -s STRL
+```
+
+![Example_Day_Plot](images/Figure_3.png)
+
+STRL  last action was Buy  on 2023-04-18 (  86 trading-days ago) at a price of   36.830 last price   77.650 percent change   110.834
+
+- Fetch and analyze 5000 trading minutes of STRL stock data from last 6 trading days with a default Hanning filter window size and a z-score threshold of 0.01:
+
+
+```
+python main.class.py -s STRL -t Minute -n 6
+```
+
+![Example_Minute_Plot](images/Figure_4.png)
+
+STRL  last action was Buy  on 2023-08-18:13:35 (  335 samples ago) at a price of   75.643 last price   77.650 percent change     2.654
 
 ## License
 
