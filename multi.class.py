@@ -158,7 +158,10 @@ for symbol in symbols:
     last_red = None
     last_green = None
 
-    for i in range(1, len(symbol_data)):
+    first = int(symbol_data.index[0]+1)
+    last = int(symbol_data.index[-1])
+
+    for i in range(first, last):
         # Update last_red or last_green
         if symbol_data.loc[i - 1, "Color"] == "Red":
             last_red = i - 1
