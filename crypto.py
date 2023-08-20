@@ -4,12 +4,11 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import pandas_market_calendars as mcal
 
 from scipy import signal
+from datetime import timedelta, datetime
 from alpaca_trade_api.rest import TimeFrame
 from matplotlib.offsetbox import AnchoredText
-from datetime import date, timedelta, datetime
 from crypto_helper import DataConfig, DataFetcher, ActionComputer, DataPlotter
 
 pd.set_option("display.max_rows", None)
@@ -39,7 +38,9 @@ def compute_trend_and_filter(num_samples, data_percent, window_size):
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Fetch OHLC data.")
-parser.add_argument("-s", "--symbol", help="Stock symbol", required=True)
+parser.add_argument(
+    "-s", "--symbol", help="Stock symbol", default="BTC/USD"
+)
 parser.add_argument(
     "-n", "--ndays", help="Number of trading days", type=int, default=504
 )
@@ -63,31 +64,37 @@ parser.add_argument(
     choices=["Day", "Minute"],
     default="Day",
 )
+parser.add_argument(
+    "-ns",
+    "--num_samples",
+    help="Number of samples",
+    type=int,
+    default=5000,
+)
 args = parser.parse_args()
 
 # Define the time frame
 TIMEFRAME = TimeFrame.Minute if args.timeframe == "Minute" else TimeFrame.Day
 
-# Get today's date
-END_DATE = date.today()
-END_DATE = datetime.combine(END_DATE, datetime.min.time())
+# Get today's date with current UTC time
+END_DATE = datetime.utcnow()
 
-# Get the NYSE trading calendar
-NYSE = mcal.get_calendar("NYSE")
-
-# Calculate the start date
-START_DATE = NYSE.valid_days(
-    start_date=END_DATE - timedelta(days=2 * args.ndays), end_date=END_DATE
-)[-args.ndays]
-
-# Convert to Python datetime object if needed
-START_DATE = pd.Timestamp(START_DATE).to_pydatetime()
+# Calculate the start date, which is ndays before the end date
+START_DATE = END_DATE - timedelta(days=args.ndays)
 
 # Convert symbol to upper case
 SYMBOL = args.symbol.upper()
 
 # Create a DataConfig instance with all necessary parameters
-DATA_CONFIG = DataConfig(SYMBOL, TIMEFRAME, START_DATE, END_DATE, args.ndays)
+DATA_CONFIG = DataConfig(
+    SYMBOL,
+    TIMEFRAME,
+    START_DATE,
+    END_DATE,
+    args.ndays,
+    args.timeframe,
+    args.num_samples,
+)
 
 # Pass the DataConfig instance to the DataFetcher constructor
 DATA_FETCHER = DataFetcher(DATA_CONFIG)
@@ -109,7 +116,10 @@ data["close_detrend_norm"] = data["close_detrend"] / max(
 )
 
 if args.window is None or args.window == 0:
-    args.window = round(args.ndays // 14.40)
+    if args.timeframe == "Minute":
+        args.window = round(data.shape[0] // 8.17)
+    else:
+        args.window = round(data.shape[0] // 9.88)
     if (args.window % 2) == 0:
         args.window += 1
 
@@ -145,9 +155,10 @@ data["Action"] = ""
 LAST_RED = None
 LAST_GREEN = None
 
-for i in range(
-    1, len(data)
-):  # start from the second row since we are checking with the previous row
+first = int(data.index[0] + 1)
+last = int(data.index[-1])
+
+for i in range(first, last):
     # Update LAST_RED or LAST_GREEN
     if data.loc[i - 1, "Color"] == "Red":
         LAST_RED = i - 1
@@ -176,7 +187,7 @@ for i in range(
 data.set_index("DateTime", inplace=True)
 
 # Compute last action and print important information
-ActionComputer.compute_actions(SYMBOL, data, END_DATE)
+ActionComputer.compute_actions(SYMBOL, data, END_DATE, args.timeframe)
 
 data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(
     abs(data["close_detrend"])
@@ -190,16 +201,18 @@ fig.set_size_inches(12, 10)
 
 # Add information text box
 info_text = f"Filter window: {window_size}"
-anchored_text = AnchoredText(info_text, loc="upper left", prop=dict(size=8), frameon=False)
+anchored_text = AnchoredText(
+    info_text, loc="lower left", prop=dict(size=8), frameon=False
+)
 anchored_text.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-ax2.add_artist(anchored_text)
+ax3.add_artist(anchored_text)
 
 color_dict = {"Red": "green", "Green": "red"}
 
-DataPlotter.plot_close_price(data, SYMBOL, ax1, color_dict)
-DataPlotter.plot_detrended_data(data, args, ax2)
+DataPlotter.plot_close_price(data, SYMBOL, ax1, color_dict, args.timeframe)
+DataPlotter.plot_detrended_data(data, args, ax2, args.timeframe)
 DataPlotter.plot_z_score_velocity(data, args, ax3)
-DataPlotter.plot_buy_sell_markers(data, ax1, ax2)
+DataPlotter.plot_buy_sell_markers(data, ax1, ax2, args.timeframe)
 
 plt.tight_layout()
 plt.show()

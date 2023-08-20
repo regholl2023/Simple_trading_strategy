@@ -1,30 +1,42 @@
 """Module for fetching and plotting stock market data."""
 
 import os
+import pytz
 import requests
 import subprocess
 import pandas as pd
 
 from datetime import datetime
+from tzlocal import get_localzone
 from alpaca_trade_api.rest import REST
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.requests import CryptoBarsRequest
 from alpaca.data.historical import CryptoHistoricalDataClient
 
+
 class DataConfig:
     """Class to hold data configuration."""
 
-    def __init__(self, symbol, timeframe, start_date, end_date, ndays, sample_rate, num_samples):
+    def __init__(
+        self,
+        symbol,
+        timeframe,
+        start_date,
+        end_date,
+        ndays,
+        sample_rate,
+        num_samples,
+    ):
         self.symbol = symbol
         self.timeframe = timeframe
         self.start_date = start_date
         self.end_date = end_date
         if isinstance(start_date, str):
-            self.start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
         else:
             self.start_date = start_date
         if isinstance(end_date, str):
-            self.end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            self.end_date = datetime.strptime(end_date, "%Y-%m-%d")
         else:
             self.end_date = end_date
         self.ndays = ndays
@@ -40,8 +52,9 @@ class DataFetcher:
         self.api_key = os.getenv("APCA_API_KEY_ID")
         self.api_secret = os.getenv("APCA_API_SECRET_KEY")
         self.api = REST(self.api_key, self.api_secret)
-        self.base_url = "https://data.alpaca.markets/v1beta3/crypto/us/latest/trades"
-
+        self.base_url = (
+            "https://data.alpaca.markets/v1beta3/crypto/us/latest/trades"
+        )
 
     def fetch_latest_trade_price(self, symbols):
         """
@@ -52,11 +65,9 @@ class DataFetcher:
         """
         headers = {
             "APCA-API-KEY-ID": self.api_key,
-            "APCA-API-SECRET-KEY": self.api_secret
+            "APCA-API-SECRET-KEY": self.api_secret,
         }
-        params = {
-            "symbols": symbols
-        }
+        params = {"symbols": symbols}
 
         response = requests.get(self.base_url, params=params, headers=headers)
 
@@ -64,7 +75,10 @@ class DataFetcher:
             # Handle errors here
             return None
 
-        trade_prices = {symbol: trade_data["p"] for symbol, trade_data in response.json()["trades"].items()}
+        trade_prices = {
+            symbol: trade_data["p"]
+            for symbol, trade_data in response.json()["trades"].items()
+        }
 
         return trade_prices
 
@@ -74,72 +88,57 @@ class DataFetcher:
         # no keys required for crypto data
         client = CryptoHistoricalDataClient()
 
-        if self.config.sample_rate == 'Day':
+        if self.config.sample_rate == "Day":
             timeframe = TimeFrame.Day
         else:
             timeframe = TimeFrame.Minute
 
         request_params = CryptoBarsRequest(
-                            symbol_or_symbols=self.config.symbol,
-                            timeframe=timeframe,
-                            start=self.config.start_date,
-                            end=self.config.end_date,
-                     )
+            symbol_or_symbols=self.config.symbol,
+            timeframe=timeframe,
+            start=self.config.start_date,
+            end=self.config.end_date,
+        )
 
         df = client.get_crypto_bars(request_params).df
 
         # Reset the index to bring 'symbol' and 'timestamp' into columns
         df.reset_index(inplace=True)
 
+        # Convert to local timezone
+        local_timezone = get_localzone()
+        df['timestamp'] = df['timestamp'].dt.tz_convert(local_timezone)
+
         # Select only the 'close' and 'timestamp' columns and rename 'timestamp' to 'DateTime'
-        df = df[['close', 'timestamp']]
-        df.rename(columns={'timestamp': 'DateTime'}, inplace=True)
+        df = df[["close", "timestamp"]]
+        df.rename(columns={"timestamp": "DateTime"}, inplace=True)
 
         # Get the current close price from the dataframe
-        current_close_price = df['close'].iloc[-1]
+        current_close_price = df["close"].iloc[-1]
 
         # Fetch the latest trade price using the new method
-        latest_trade_prices = self.fetch_latest_trade_price(self.config.symbol)
+        latest_trade_prices = self.fetch_latest_trade_price(
+            self.config.symbol
+        )
         latest_trade_price = latest_trade_prices.get(self.config.symbol, None)
 
         # Compare and replace if the latest trade price is different from the current close price
-        if latest_trade_price is not None and latest_trade_price != current_close_price:
-            df.at[df.index[-1], 'close'] = latest_trade_price
+        local_time = datetime.now().astimezone()
+        if (
+            latest_trade_price is not None
+            and latest_trade_price != current_close_price
+        ):
+            # Convert the local time to a timestamp without microseconds
+            local_timestamp = pd.Timestamp(local_time.replace(microsecond=0))
+
+            # Append a new row with the latest trade price and local timestamp
+            new_row = {
+                "close": latest_trade_price,
+                "DateTime": local_timestamp
+            }
+            df = df.append(new_row, ignore_index=True)
 
         return latest_trade_price, df
-
-    def fetch_data(self):
-        """Fetch stock market data."""
-        data_frame = self.api.get_bars(
-            self.config.symbol,
-            self.config.timeframe,
-            self.config.start_date.isoformat(),
-            self.config.end_date.isoformat(),
-            adjustment="split",
-        ).df
-        data = pd.DataFrame(data_frame["close"])
-        data.index = pd.to_datetime(data.index)
-        current_price = self.api.get_latest_trade(self.config.symbol).price
-        last_date_in_data = data.index[-1].date()
-        end_date_tz = pd.Timestamp(self.config.end_date).tz_localize(
-            data.index.tz
-        )
-        if last_date_in_data == end_date_tz.date():
-            if current_price != data.iloc[-1, 0]:
-                data.iloc[-1, 0] = current_price
-        else:
-            data = data.append(
-                pd.DataFrame({"close": current_price}, index=[end_date_tz])
-            )
-        data["DateTime"] = data.index
-        data.reset_index(drop=True, inplace=True)
-
-        if self.config.sample_rate == 'Minute':
-            data = data[-self.config.ns:]
-        else:
-            data = data[-self.config.ndays:]
-
-        return current_price, data
 
 
 class ActionComputer:
@@ -176,27 +175,30 @@ class ActionComputer:
         else:
             last_action = None
 
-
         if last_action:
-            rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
+            rows_from_end = (
+                len(data) - data.index.get_loc(last_action_date) - 1
+            )
             last_price = data["close"].iloc[-1]
-            percent_change = (last_price - last_action_price) / last_action_price * 100.0
+            percent_change = (
+                (last_price - last_action_price) / last_action_price * 100.0
+            )
             if timeframe == "Minute":
                 print(
-                    f'{symbol:5s} last action was {last_action:4s} on '
+                    f"{symbol:5s} last action was {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d:%H:%M")} '
-                    f'({rows_from_end:5d} samples ago) at a '
-                    f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
-                    f'percent change {percent_change:9.3f}'
+                    f"({rows_from_end:5d} samples ago) at a "
+                    f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                    f"percent change {percent_change:9.3f}"
                 )
             else:
                 df_with_row_number = data.reset_index()
                 print(
-                    f'{symbol:5s} last action was {last_action:4s} on '
+                    f"{symbol:5s} last action was {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d")} '
-                    f'({rows_from_end:4d} trading-days ago) at a '
-                    f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
-                    f'percent change {percent_change:9.3f}'
+                    f"({rows_from_end:4d} trading-days ago) at a "
+                    f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                    f"percent change {percent_change:9.3f}"
                 )
         else:
             print("No Buy or Sell actions were recorded.")
@@ -234,9 +236,7 @@ class DataPlotter:
             f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}'
         )
 
-        y_values_filtered = data[
-            "close_detrend_norm_filt_adj"
-        ].to_numpy()
+        y_values_filtered = data["close_detrend_norm_filt_adj"].to_numpy()
         ax1.plot(
             x_values,
             y_values_filtered,
@@ -278,7 +278,7 @@ class DataPlotter:
         if timeframe == "Minute":
             ax1.set_xticks(x_values[:: len(data) // 10])
             ax1.set_xticklabels(
-                data.index[:: len(data) // 10].strftime("%Y-%m-%d %H:%M"),
+                [idx.strftime("%Y-%m-%d %H:%M") for idx in data.index[:: len(data) // 10]],
                 rotation=45,
             )
 
@@ -317,7 +317,7 @@ class DataPlotter:
         if timeframe == "Minute":
             ax2.set_xticks(x_values[:: len(data) // 10])
             ax2.set_xticklabels(
-                data.index[:: len(data) // 10].strftime("%Y-%m-%d"),
+                [idx.strftime("%Y-%m-%d") for idx in data.index[:: len(data) // 10]],
                 rotation=45,
             )
 
@@ -331,7 +331,11 @@ class DataPlotter:
     def plot_z_score_velocity(data, args, ax3):
         """Plot z-score velocity."""
 
-        x_values = range(len(data)) if args.timeframe == 'Minute' else data.index.to_numpy()
+        x_values = (
+            range(len(data))
+            if args.timeframe == "Minute"
+            else data.index.to_numpy()
+        )
 
         y_values = data["zscore_velocity"].to_numpy()
 
@@ -356,9 +360,12 @@ class DataPlotter:
             alpha=0.3,
         )
 
-        if args.timeframe == 'Minute':
-            ax3.set_xticks(x_values[::len(data)//10])
-            ax3.set_xticklabels(data.index[::len(data)//10].strftime("%Y-%m-%d %H:%M"), rotation=45)
+        if args.timeframe == "Minute":
+            ax3.set_xticks(x_values[:: len(data) // 10])
+            ax3.set_xticklabels(
+                [idx.strftime("%Y-%m-%d %H:%M") for idx in data.index[:: len(data) // 10]],
+                rotation=45,
+            )
 
         ax3.set_xlabel("Date")
         ax3.set_ylabel("Filtered Velocity (Z-score)")
