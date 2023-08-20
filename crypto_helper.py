@@ -145,7 +145,7 @@ class ActionComputer:
     """Class to compute buy/sell actions."""
 
     @staticmethod
-    def compute_actions(symbol, data, end_date, timeframe):
+    def compute_actions(symbol, data, end_date, timeframe, convert):
         """Compute buy/sell actions."""
         buy_actions = data[data["Action"] == "Buy"]
         sell_actions = data[data["Action"] == "Sell"]
@@ -155,6 +155,7 @@ class ActionComputer:
         last_sell_date = (
             sell_actions.index[-1] if not sell_actions.empty else None
         )
+
         if last_buy_date and last_sell_date:
             if last_buy_date > last_sell_date:
                 last_action = "Buy"
@@ -179,10 +180,22 @@ class ActionComputer:
             rows_from_end = (
                 len(data) - data.index.get_loc(last_action_date) - 1
             )
+
+            column = "close"
             last_price = data["close"].iloc[-1]
+            last_action_price_new = last_action_price
+            if convert == 1:
+                column = "close_orig"
+                if last_action == "Buy":
+                    last_action_price_new = buy_actions.loc[last_buy_date, column]
+                else:
+                    last_action_price_new = sell_actions.loc[last_sell_date, column]
+            last_price_new = data[column].iloc[-1]
+
             percent_change = (
-                (last_price - last_action_price) / last_action_price * 100.0
+                (last_price_new - last_action_price_new) / last_action_price_new * 100.0
             )
+
             if timeframe == "Minute":
                 print(
                     f"{symbol:5s} last action was {last_action:4s} on "
@@ -233,7 +246,7 @@ class DataPlotter:
 
         ax1.set_title(
             f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} '
-            f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}'
+            f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]:.3f}'
         )
 
         y_values_filtered = data["close_detrend_norm_filt_adj"].to_numpy()

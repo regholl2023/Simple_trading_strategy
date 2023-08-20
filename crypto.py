@@ -71,6 +71,14 @@ parser.add_argument(
     type=int,
     default=5000,
 )
+parser.add_argument(
+    "-c",
+    "--convert",
+    help="Convert prices to standard deviations (0 or 1)",
+    type=int,
+    choices=[0, 1],
+    default=0,
+)
 args = parser.parse_args()
 
 # Define the time frame
@@ -100,6 +108,15 @@ DATA_CONFIG = DataConfig(
 DATA_FETCHER = DataFetcher(DATA_CONFIG)
 
 CURRENT_PRICE, data = DATA_FETCHER.fetch_crypto_data()
+
+# Convert prices to standard deviations if std_dev argument is set to 1
+if args.convert == 1:
+    # Copy the close column to a close_orig column
+    data['close_orig'] = data['close'].copy()
+    mean_price = data['close'].mean()
+    std_dev_price = data['close'].std()
+    data['close'] = (data['close'] - mean_price) / std_dev_price
+    CURRENT_PRICE = (CURRENT_PRICE - mean_price) / std_dev_price
 
 # Create linear trend line
 x = np.linspace(0, len(data.index) - 1, len(data.index))
@@ -187,7 +204,7 @@ for i in range(first, last):
 data.set_index("DateTime", inplace=True)
 
 # Compute last action and print important information
-ActionComputer.compute_actions(SYMBOL, data, END_DATE, args.timeframe)
+ActionComputer.compute_actions(SYMBOL, data, END_DATE, args.timeframe, args.convert)
 
 data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(
     abs(data["close_detrend"])
