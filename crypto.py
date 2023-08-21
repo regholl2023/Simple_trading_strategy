@@ -38,46 +38,52 @@ def compute_trend_and_filter(num_samples, data_percent, window_size):
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Fetch OHLC data.")
+parser.add_argument("-s", "--symbol", help="Stock symbol (Default: BTC/USD)", default="BTC/USD")
 parser.add_argument(
-    "-s", "--symbol", help="Stock symbol", default="BTC/USD"
-)
-parser.add_argument(
-    "-n", "--ndays", help="Number of trading days", type=int, default=504
+        "-n", "--ndays", help="Number of trading days (Default: 504)", type=int, default=504
 )
 parser.add_argument(
     "-w",
     "--window",
-    help="Define window size for the Hanning filter",
+    help="Define window size for the Hanning filter (Default:0, computed from number of samples)",
     type=int,
 )
 parser.add_argument(
     "-sd",
     "--std_dev",
-    help="Number of standard deviations for the dashed lines",
+    help="Number of standard deviations for the dashed lines (Default: 0.10)",
     type=float,
-    default=0.01,
+    default=0.10,
 )
 parser.add_argument(
     "-t",
     "--timeframe",
-    help="Timeframe for the OHLC data",
+    help="Timeframe for the OHLC data (Default: Day)",
     choices=["Day", "Minute"],
     default="Day",
 )
 parser.add_argument(
     "-ns",
     "--num_samples",
-    help="Number of samples",
+    help="Maximum number of samples in analysis (Default: 5000)",
     type=int,
     default=5000,
 )
 parser.add_argument(
     "-c",
     "--convert",
-    help="Convert prices to standard deviations (0 or 1)",
+    help="Convert prices to standard deviations (0 or 1, Default: 0)",
     type=int,
     choices=[0, 1],
     default=0,
+)
+parser.add_argument(
+    "-p",
+    "--plot_switch",
+    help="Switch to turn on (1) or off (0) plotting (Default: 1)",
+    type=int,
+    choices=[0, 1],
+    default=1,
 )
 args = parser.parse_args()
 
@@ -109,13 +115,16 @@ DATA_FETCHER = DataFetcher(DATA_CONFIG)
 
 CURRENT_PRICE, data = DATA_FETCHER.fetch_crypto_data()
 
+data = data[-args.num_samples:]
+num_samples = data.shape[0]
+
 # Convert prices to standard deviations if std_dev argument is set to 1
 if args.convert == 1:
     # Copy the close column to a close_orig column
-    data['close_orig'] = data['close'].copy()
-    mean_price = data['close'].mean()
-    std_dev_price = data['close'].std()
-    data['close'] = (data['close'] - mean_price) / std_dev_price
+    data["close_orig"] = data["close"].copy()
+    mean_price = data["close"].mean()
+    std_dev_price = data["close"].std()
+    data["close"] = (data["close"] - mean_price) / std_dev_price
     CURRENT_PRICE = (CURRENT_PRICE - mean_price) / std_dev_price
 
 # Create linear trend line
@@ -134,7 +143,7 @@ data["close_detrend_norm"] = data["close_detrend"] / max(
 
 if args.window is None or args.window == 0:
     if args.timeframe == "Minute":
-        args.window = round(data.shape[0] // 8.17)
+        args.window = round(data.shape[0] // 12.43)
     else:
         args.window = round(data.shape[0] // 9.88)
     if (args.window % 2) == 0:
@@ -204,32 +213,37 @@ for i in range(first, last):
 data.set_index("DateTime", inplace=True)
 
 # Compute last action and print important information
-ActionComputer.compute_actions(SYMBOL, data, END_DATE, args.timeframe, args.convert)
-
-data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(
-    abs(data["close_detrend"])
-) + trend_line(x)
-
-# Create subplots with custom layout
-fig, (ax1, ax2, ax3) = plt.subplots(
-    3, sharex=True, gridspec_kw={"height_ratios": [2, 1, 1]}
+ActionComputer.compute_actions(
+    SYMBOL, data, END_DATE, args.timeframe, args.convert, window_size, num_samples
 )
-fig.set_size_inches(12, 10)
 
-# Add information text box
-info_text = f"Filter window: {window_size}"
-anchored_text = AnchoredText(
-    info_text, loc="lower left", prop=dict(size=8), frameon=False
-)
-anchored_text.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-ax3.add_artist(anchored_text)
+if args.plot_switch == 1:
+    data["close_detrend_norm_filt_adj"] = data[
+        "close_detrend_norm_filt"
+    ] * max(abs(data["close_detrend"])) + trend_line(x)
 
-color_dict = {"Red": "green", "Green": "red"}
+    # Create subplots with custom layout
+    fig, (ax1, ax2, ax3) = plt.subplots(
+        3, sharex=True, gridspec_kw={"height_ratios": [2, 1, 1]}
+    )
+    fig.set_size_inches(12, 10)
 
-DataPlotter.plot_close_price(data, SYMBOL, ax1, color_dict, args.timeframe)
-DataPlotter.plot_detrended_data(data, args, ax2, args.timeframe)
-DataPlotter.plot_z_score_velocity(data, args, ax3)
-DataPlotter.plot_buy_sell_markers(data, ax1, ax2, args.timeframe)
+    # Add information text box
+    info_text = f"Filter window: {window_size}"
+    anchored_text = AnchoredText(
+        info_text, loc="lower left", prop=dict(size=8), frameon=False
+    )
+    anchored_text.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+    ax3.add_artist(anchored_text)
 
-plt.tight_layout()
-plt.show()
+    color_dict = {"Red": "green", "Green": "red"}
+
+    DataPlotter.plot_close_price(
+        data, SYMBOL, ax1, color_dict, args.timeframe
+    )
+    DataPlotter.plot_detrended_data(data, args, ax2, args.timeframe)
+    DataPlotter.plot_z_score_velocity(data, args, ax3)
+    DataPlotter.plot_buy_sell_markers(data, ax1, ax2, args.timeframe)
+
+    plt.tight_layout()
+    plt.show()

@@ -107,7 +107,7 @@ class DataFetcher:
 
         # Convert to local timezone
         local_timezone = get_localzone()
-        df['timestamp'] = df['timestamp'].dt.tz_convert(local_timezone)
+        df["timestamp"] = df["timestamp"].dt.tz_convert(local_timezone)
 
         # Select only the 'close' and 'timestamp' columns and rename 'timestamp' to 'DateTime'
         df = df[["close", "timestamp"]]
@@ -134,7 +134,7 @@ class DataFetcher:
             # Append a new row with the latest trade price and local timestamp
             new_row = {
                 "close": latest_trade_price,
-                "DateTime": local_timestamp
+                "DateTime": local_timestamp,
             }
             df = df.append(new_row, ignore_index=True)
 
@@ -145,7 +145,7 @@ class ActionComputer:
     """Class to compute buy/sell actions."""
 
     @staticmethod
-    def compute_actions(symbol, data, end_date, timeframe, convert):
+    def compute_actions(symbol, data, end_date, timeframe, convert, window, num_samples):
         """Compute buy/sell actions."""
         buy_actions = data[data["Action"] == "Buy"]
         sell_actions = data[data["Action"] == "Sell"]
@@ -187,30 +187,36 @@ class ActionComputer:
             if convert == 1:
                 column = "close_orig"
                 if last_action == "Buy":
-                    last_action_price_new = buy_actions.loc[last_buy_date, column]
+                    last_action_price_new = buy_actions.loc[
+                        last_buy_date, column
+                    ]
                 else:
-                    last_action_price_new = sell_actions.loc[last_sell_date, column]
+                    last_action_price_new = sell_actions.loc[
+                        last_sell_date, column
+                    ]
             last_price_new = data[column].iloc[-1]
 
             percent_change = (
-                (last_price_new - last_action_price_new) / last_action_price_new * 100.0
+                (last_price_new - last_action_price_new)
+                / last_action_price_new
+                * 100.0
             )
 
             if timeframe == "Minute":
                 print(
-                    f"{symbol:5s} last action was {last_action:4s} on "
+                    f"{symbol:5s} {window:5d} {num_samples:6d} last_action {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d:%H:%M")} '
                     f"({rows_from_end:5d} samples ago) at a "
-                    f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                    f"action price {last_action_price:8.3f} last price {last_price:8.3f} "
                     f"percent change {percent_change:9.3f}"
                 )
             else:
                 df_with_row_number = data.reset_index()
                 print(
-                    f"{symbol:5s} last action was {last_action:4s} on "
+                    f"{symbol:5s} {window:5d} {num_samples:6d} last_action {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d")} '
                     f"({rows_from_end:4d} trading-days ago) at a "
-                    f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                    f"action price {last_action_price:8.3f} last price {last_price:8.3f} "
                     f"percent change {percent_change:9.3f}"
                 )
         else:
@@ -291,7 +297,10 @@ class DataPlotter:
         if timeframe == "Minute":
             ax1.set_xticks(x_values[:: len(data) // 10])
             ax1.set_xticklabels(
-                [idx.strftime("%Y-%m-%d %H:%M") for idx in data.index[:: len(data) // 10]],
+                [
+                    idx.strftime("%Y-%m-%d %H:%M")
+                    for idx in data.index[:: len(data) // 10]
+                ],
                 rotation=45,
             )
 
@@ -330,7 +339,10 @@ class DataPlotter:
         if timeframe == "Minute":
             ax2.set_xticks(x_values[:: len(data) // 10])
             ax2.set_xticklabels(
-                [idx.strftime("%Y-%m-%d") for idx in data.index[:: len(data) // 10]],
+                [
+                    idx.strftime("%Y-%m-%d")
+                    for idx in data.index[:: len(data) // 10]
+                ],
                 rotation=45,
             )
 
@@ -376,7 +388,10 @@ class DataPlotter:
         if args.timeframe == "Minute":
             ax3.set_xticks(x_values[:: len(data) // 10])
             ax3.set_xticklabels(
-                [idx.strftime("%Y-%m-%d %H:%M") for idx in data.index[:: len(data) // 10]],
+                [
+                    idx.strftime("%Y-%m-%d %H:%M")
+                    for idx in data.index[:: len(data) // 10]
+                ],
                 rotation=45,
             )
 
