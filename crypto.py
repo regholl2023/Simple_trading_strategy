@@ -51,9 +51,9 @@ parser.add_argument(
 parser.add_argument(
     "-sd",
     "--std_dev",
-    help="Number of standard deviations for the dashed lines (Default: 0.10)",
+    help="Number of standard deviations for the dashed lines (Default: 0.01)",
     type=float,
-    default=0.10,
+    default=0.01,
 )
 parser.add_argument(
     "-t",

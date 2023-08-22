@@ -10,6 +10,7 @@ from datetime import datetime
 from tzlocal import get_localzone
 from alpaca_trade_api.rest import REST
 from alpaca.data.timeframe import TimeFrame
+from alpaca.trading.client import TradingClient
 from alpaca.data.requests import CryptoBarsRequest
 from alpaca.data.historical import CryptoHistoricalDataClient
 
@@ -52,35 +53,6 @@ class DataFetcher:
         self.api_key = os.getenv("APCA_API_KEY_ID")
         self.api_secret = os.getenv("APCA_API_SECRET_KEY")
         self.api = REST(self.api_key, self.api_secret)
-        self.base_url = (
-            "https://data.alpaca.markets/v1beta3/crypto/us/latest/trades"
-        )
-
-    def fetch_latest_trade_price(self, symbols):
-        """
-        Fetches the latest trade information for the given crypto symbols and returns the trade price.
-
-        :param symbols: Comma-separated string of crypto symbols.
-        :return: Dictionary containing the trade price for each symbol.
-        """
-        headers = {
-            "APCA-API-KEY-ID": self.api_key,
-            "APCA-API-SECRET-KEY": self.api_secret,
-        }
-        params = {"symbols": symbols}
-
-        response = requests.get(self.base_url, params=params, headers=headers)
-
-        if response.status_code != 200:
-            # Handle errors here
-            return None
-
-        trade_prices = {
-            symbol: trade_data["p"]
-            for symbol, trade_data in response.json()["trades"].items()
-        }
-
-        return trade_prices
 
     def fetch_crypto_data(self):
         """Fetch cryptocurrency market data."""
@@ -114,29 +86,7 @@ class DataFetcher:
         df.rename(columns={"timestamp": "DateTime"}, inplace=True)
 
         # Get the current close price from the dataframe
-        current_close_price = df["close"].iloc[-1]
-
-        # Fetch the latest trade price using the new method
-        latest_trade_prices = self.fetch_latest_trade_price(
-            self.config.symbol
-        )
-        latest_trade_price = latest_trade_prices.get(self.config.symbol, None)
-
-        # Compare and replace if the latest trade price is different from the current close price
-        local_time = datetime.now().astimezone()
-        if (
-            latest_trade_price is not None
-            and latest_trade_price != current_close_price
-        ):
-            # Convert the local time to a timestamp without microseconds
-            local_timestamp = pd.Timestamp(local_time.replace(microsecond=0))
-
-            # Append a new row with the latest trade price and local timestamp
-            new_row = {
-                "close": latest_trade_price,
-                "DateTime": local_timestamp,
-            }
-            df = df.append(new_row, ignore_index=True)
+        latest_trade_price = df["close"].iloc[-1]
 
         return latest_trade_price, df
 
