@@ -4,10 +4,15 @@ Module containing helper functions for fetching, processing, and plotting financ
 
 import os
 import subprocess
-from alpaca_trade_api.rest import REST
 import pandas as pd
 
-def fetch_data(symbol, timeframe, start_date, end_date, ndays, sample_rate, num_samples):
+from dateutil import tz
+from alpaca_trade_api.rest import REST
+
+
+def fetch_data(
+    symbol, timeframe, start_date, end_date, ndays, sample_rate, num_samples
+):
     """
     Fetches financial data for the given symbol and timeframe.
     """
@@ -24,10 +29,12 @@ def fetch_data(symbol, timeframe, start_date, end_date, ndays, sample_rate, num_
     data = pd.DataFrame(data_frame["close"])
     data.index = pd.to_datetime(data.index)
 
-    # for testing specific dates
-    # current_price = data["close"].iloc[-1]
+    # Get the local timezone
+    local_tz = tz.tzlocal()
 
-    # comment this section out for testing specific dates
+    # Convert index to local timezone
+    data.index = data.index.tz_convert(local_tz)
+
     current_price = api.get_latest_trade(symbol).price
     last_date_in_data = data.index[-1].date()
     end_date_tz = pd.Timestamp(end_date).tz_localize(data.index.tz)
@@ -35,15 +42,19 @@ def fetch_data(symbol, timeframe, start_date, end_date, ndays, sample_rate, num_
         if current_price != data.iloc[-1, 0]:
             data.iloc[-1, 0] = current_price
     else:
-        data = data.append(pd.DataFrame({"close": current_price}, index=[end_date_tz]))
+        data = data.append(
+            pd.DataFrame({"close": current_price}, index=[end_date_tz])
+        )
 
     data["DateTime"] = data.index
     data.reset_index(drop=True, inplace=True)
-    if sample_rate == 'Minute':
+    if sample_rate == "Minute":
         data = data[-num_samples:]
     else:
         data = data[-ndays:]
+
     return current_price, data
+
 
 def compute_actions(symbol, data, end_date, timeframe):
     """
@@ -52,7 +63,9 @@ def compute_actions(symbol, data, end_date, timeframe):
     buy_actions = data[data["Action"] == "Buy"]
     sell_actions = data[data["Action"] == "Sell"]
     last_buy_date = buy_actions.index[-1] if not buy_actions.empty else None
-    last_sell_date = sell_actions.index[-1] if not sell_actions.empty else None
+    last_sell_date = (
+        sell_actions.index[-1] if not sell_actions.empty else None
+    )
     if last_buy_date and last_sell_date:
         if last_buy_date > last_sell_date:
             last_action = "Buy"
@@ -76,26 +89,29 @@ def compute_actions(symbol, data, end_date, timeframe):
     if last_action:
         rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
         last_price = data["close"].iloc[-1]
-        percent_change = (last_price - last_action_price) / last_action_price * 100.0
+        percent_change = (
+            (last_price - last_action_price) / last_action_price * 100.0
+        )
         if timeframe == "Minute":
             print(
-                f'{symbol:5s} last action was {last_action:4s} on '
+                f"{symbol:5s} last action was {last_action:4s} on "
                 f'{last_action_date.strftime("%Y-%m-%d:%H:%M")} '
-                f'({rows_from_end:5d} samples ago) at a '
-                f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
-                f'percent change {percent_change:9.3f}'
+                f"({rows_from_end:5d} samples ago) at a "
+                f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                f"percent change {percent_change:9.3f}"
             )
         else:
             df_with_row_number = data.reset_index()
             print(
-                f'{symbol:5s} last action was {last_action:4s} on '
+                f"{symbol:5s} last action was {last_action:4s} on "
                 f'{last_action_date.strftime("%Y-%m-%d")} '
-                f'({rows_from_end:4d} trading-days ago) at a '
-                f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
-                f'percent change {percent_change:9.3f}'
+                f"({rows_from_end:4d} trading-days ago) at a "
+                f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                f"percent change {percent_change:9.3f}"
             )
     else:
         print("No Buy or Sell actions were recorded.")
+
 
 def get_company_name(symbol_namespace):
     """Get company name by symbol."""
@@ -107,13 +123,12 @@ def get_company_name(symbol_namespace):
     )
     return result.stdout.strip() or ""
 
+
 def plot_close_price(data, symbol, ax1, color_dict, timeframe):
     """Plot close price."""
 
     x_values = (
-        range(len(data))
-        if timeframe == "Minute"
-        else data.index.to_numpy()
+        range(len(data)) if timeframe == "Minute" else data.index.to_numpy()
     )
     y_values = data["close"].to_numpy()
 
@@ -124,9 +139,7 @@ def plot_close_price(data, symbol, ax1, color_dict, timeframe):
         f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}'
     )
 
-    y_values_filtered = data[
-        "close_detrend_norm_filt_adj"
-    ].to_numpy()
+    y_values_filtered = data["close_detrend_norm_filt_adj"].to_numpy()
     ax1.plot(
         x_values,
         y_values_filtered,
@@ -176,18 +189,15 @@ def plot_close_price(data, symbol, ax1, color_dict, timeframe):
     ax1.grid(color="lightgrey")
     ax1.legend()
 
+
 def plot_detrended_data(data, symbol, ax2, timeframe):
     """Plot detrended data."""
 
     x_values = (
-        range(len(data))
-        if timeframe == "Minute"
-        else data.index.to_numpy()
+        range(len(data)) if timeframe == "Minute" else data.index.to_numpy()
     )
     y_values_detrend_norm = data["close_detrend_norm"].to_numpy()
-    y_values_detrend_norm_filt = data[
-        "close_detrend_norm_filt"
-    ].to_numpy()
+    y_values_detrend_norm_filt = data["close_detrend_norm_filt"].to_numpy()
 
     company_name = get_company_name(symbol)
     title = (
@@ -199,9 +209,7 @@ def plot_detrended_data(data, symbol, ax2, timeframe):
     ax2.plot(
         x_values, y_values_detrend_norm, label="Detrended and Normalized"
     )
-    ax2.plot(
-        x_values, y_values_detrend_norm_filt, label="Low-pass Filtered"
-    )
+    ax2.plot(x_values, y_values_detrend_norm_filt, label="Low-pass Filtered")
 
     if timeframe == "Minute":
         ax2.set_xticks(x_values[:: len(data) // 10])
@@ -216,10 +224,15 @@ def plot_detrended_data(data, symbol, ax2, timeframe):
     ax2.grid(color="lightgrey")
     ax2.legend()
 
+
 def plot_z_score_velocity(data, args, ax3):
     """Plot z-score velocity."""
 
-    x_values = range(len(data)) if args.timeframe == 'Minute' else data.index.to_numpy()
+    x_values = (
+        range(len(data))
+        if args.timeframe == "Minute"
+        else data.index.to_numpy()
+    )
 
     y_values = data["zscore_velocity"].to_numpy()
 
@@ -244,14 +257,18 @@ def plot_z_score_velocity(data, args, ax3):
         alpha=0.3,
     )
 
-    if args.timeframe == 'Minute':
-        ax3.set_xticks(x_values[::len(data)//10])
-        ax3.set_xticklabels(data.index[::len(data)//10].strftime("%Y-%m-%d %H:%M"), rotation=45)
+    if args.timeframe == "Minute":
+        ax3.set_xticks(x_values[:: len(data) // 10])
+        ax3.set_xticklabels(
+            data.index[:: len(data) // 10].strftime("%Y-%m-%d %H:%M"),
+            rotation=45,
+        )
 
     ax3.set_xlabel("Date")
     ax3.set_ylabel("Filtered Velocity (Z-score)")
     ax3.set_title("Z-score of Filtered Velocity")
     ax3.grid(color="lightgrey")
+
 
 def plot_buy_sell_markers(data, ax1, ax2, timeframe):
     """Plot buy/sell markers."""
@@ -305,9 +322,7 @@ def plot_buy_sell_markers(data, ax1, ax2, timeframe):
             verticalalignment="top",
             horizontalalignment="center",
         )
-    for sell_x, sell_data in zip(
-        x_values_sell, sell_actions.itertuples()
-    ):
+    for sell_x, sell_data in zip(x_values_sell, sell_actions.itertuples()):
         ax1.scatter(
             sell_x,
             sell_data.close,

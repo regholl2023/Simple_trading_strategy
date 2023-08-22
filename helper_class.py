@@ -4,6 +4,7 @@ import os
 import subprocess
 import pandas as pd
 
+from dateutil import tz
 from pandas import Timestamp
 from alpaca_trade_api.rest import REST
 
@@ -11,7 +12,16 @@ from alpaca_trade_api.rest import REST
 class DataConfig:
     """Class to hold data configuration."""
 
-    def __init__(self, symbol, timeframe, start_date, end_date, ndays, sample_rate, num_samples):
+    def __init__(
+        self,
+        symbol,
+        timeframe,
+        start_date,
+        end_date,
+        ndays,
+        sample_rate,
+        num_samples,
+    ):
         self.symbol = symbol
         self.timeframe = timeframe
         self.start_date = start_date
@@ -41,6 +51,10 @@ class DataFetcher:
         ).df
         data = pd.DataFrame(data_frame["close"])
         data.index = pd.to_datetime(data.index)
+
+        local_tz = tz.tzlocal()
+        data.index = data.index.tz_convert(local_tz)
+
         current_price = self.api.get_latest_trade(self.config.symbol).price
         last_date_in_data = data.index[-1].date()
         end_date_tz = pd.Timestamp(self.config.end_date).tz_localize(
@@ -56,10 +70,10 @@ class DataFetcher:
         data["DateTime"] = data.index
         data.reset_index(drop=True, inplace=True)
 
-        if self.config.sample_rate == 'Minute':
-            data = data[-self.config.ns:]
+        if self.config.sample_rate == "Minute":
+            data = data[-self.config.ns :]
         else:
-            data = data[-self.config.ndays:]
+            data = data[-self.config.ndays :]
 
         return current_price, data
 
@@ -99,25 +113,29 @@ class ActionComputer:
             last_action = None
 
         if last_action:
-            rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
+            rows_from_end = (
+                len(data) - data.index.get_loc(last_action_date) - 1
+            )
             last_price = data["close"].iloc[-1]
-            percent_change = (last_price - last_action_price) / last_action_price * 100.0
+            percent_change = (
+                (last_price - last_action_price) / last_action_price * 100.0
+            )
             if timeframe == "Minute":
                 print(
-                    f'{symbol:5s} last action was {last_action:4s} on '
+                    f"{symbol:5s} last action was {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d:%H:%M")} '
-                    f'({rows_from_end:5d} samples ago) at a '
-                    f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
-                    f'percent change {percent_change:9.3f}'
+                    f"({rows_from_end:5d} samples ago) at a "
+                    f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                    f"percent change {percent_change:9.3f}"
                 )
             else:
                 df_with_row_number = data.reset_index()
                 print(
-                    f'{symbol:5s} last action was {last_action:4s} on '
+                    f"{symbol:5s} last action was {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d")} '
-                    f'({rows_from_end:4d} trading-days ago) at a '
-                    f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
-                    f'percent change {percent_change:9.3f}'
+                    f"({rows_from_end:4d} trading-days ago) at a "
+                    f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                    f"percent change {percent_change:9.3f}"
                 )
         else:
             print("No Buy or Sell actions were recorded.")
@@ -155,9 +173,7 @@ class DataPlotter:
             f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}'
         )
 
-        y_values_filtered = data[
-            "close_detrend_norm_filt_adj"
-        ].to_numpy()
+        y_values_filtered = data["close_detrend_norm_filt_adj"].to_numpy()
         ax1.plot(
             x_values,
             y_values_filtered,
@@ -252,7 +268,11 @@ class DataPlotter:
     def plot_z_score_velocity(data, args, ax3):
         """Plot z-score velocity."""
 
-        x_values = range(len(data)) if args.timeframe == 'Minute' else data.index.to_numpy()
+        x_values = (
+            range(len(data))
+            if args.timeframe == "Minute"
+            else data.index.to_numpy()
+        )
 
         y_values = data["zscore_velocity"].to_numpy()
 
@@ -277,9 +297,12 @@ class DataPlotter:
             alpha=0.3,
         )
 
-        if args.timeframe == 'Minute':
-            ax3.set_xticks(x_values[::len(data)//10])
-            ax3.set_xticklabels(data.index[::len(data)//10].strftime("%Y-%m-%d %H:%M"), rotation=45)
+        if args.timeframe == "Minute":
+            ax3.set_xticks(x_values[:: len(data) // 10])
+            ax3.set_xticklabels(
+                data.index[:: len(data) // 10].strftime("%Y-%m-%d %H:%M"),
+                rotation=45,
+            )
 
         ax3.set_xlabel("Date")
         ax3.set_ylabel("Filtered Velocity (Z-score)")
