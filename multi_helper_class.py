@@ -85,9 +85,7 @@ class DataFetcher:
             response_json = response.json()
 
             # Append the data for each symbol to the DataFrame
-            for symbol, bars in list(
-                response_json["bars"].items()
-            ):  # Create a list copy for iteration
+            for symbol, bars in list(response_json["bars"].items()):
                 df = pd.DataFrame(bars)
                 df = df[["c", "t"]]
                 df["symbol"] = symbol
@@ -113,10 +111,10 @@ class DataFetcher:
                     )
                     df = df.append(new_row, ignore_index=True)
 
-                if self.sample_rate == 'Day':
-                    df = df[-self.ndays:]
+                if self.sample_rate == "Day":
+                    df = df[-self.ndays :]
                 else:
-                    df = df[-self.ns:]
+                    df = df[-self.ns :]
                 data = data.append(df)
 
             # If there's a next_page_token, update the page_token and continue the loop
@@ -137,7 +135,7 @@ class ActionComputer:
         )
         last_sell_date = (
             sell_actions.index[-1] if not sell_actions.empty else None
-        ) 
+        )
         if last_buy_date and last_sell_date:
             if last_buy_date > last_sell_date:
                 last_action = "Buy"
@@ -160,8 +158,10 @@ class ActionComputer:
 
         if last_action:
             last_price = data["c"].iloc[-1]
-            percent_change = (last_price - last_action_price) / last_action_price * 100.0
-            if timeframe == 'Day':
+            percent_change = (
+                (last_price - last_action_price) / last_action_price * 100.0
+            )
+            if timeframe == "Day":
                 rows_from_end = (
                     len(data) - data.index.get_loc(last_action_date) - 1
                 )
@@ -178,20 +178,22 @@ class ActionComputer:
 
                 df_with_row_number = data.reset_index()
                 print(
-                    f'{symbol:5s} last action was {last_action:4s} on '
+                    f"{symbol:5s} last action was {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d")} '
-                    f'({rows_from_end:4d} trading-days ago) at a '
-                    f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
-                    f'percent change {percent_change:9.3f}'
+                    f"({rows_from_end:4d} trading-days ago) at a "
+                    f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                    f"percent change {percent_change:9.3f}"
                 )
             else:
-                rows_from_end = len(data) - data.index.get_loc(last_action_date) - 1
+                rows_from_end = (
+                    len(data) - data.index.get_loc(last_action_date) - 1
+                )
                 print(
-                    f'{symbol:5s} last action was {last_action:4s} on '
+                    f"{symbol:5s} last action was {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d:%H:%M")} '
-                    f'({rows_from_end:5d} samples ago) at a '
-                    f'price of {last_action_price:8.3f} last price {last_price:8.3f} '
-                    f'percent change {percent_change:9.3f}'
+                    f"({rows_from_end:5d} samples ago) at a "
+                    f"price of {last_action_price:8.3f} last price {last_price:8.3f} "
+                    f"percent change {percent_change:9.3f}"
                 )
         else:
             print("No Buy or Sell actions were recorded.")

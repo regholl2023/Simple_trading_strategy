@@ -52,14 +52,14 @@ class DataFetcher:
         data = pd.DataFrame(data_frame["close"])
         data.index = pd.to_datetime(data.index)
 
-        local_tz = tz.tzlocal()
-        data.index = data.index.tz_convert(local_tz)
+        end_date_tz = pd.Timestamp(self.config.end_date)
+        if self.config.sample_rate == "Minute":
+            local_tz = tz.tzlocal()
+            data.index = data.index.tz_convert(local_tz)
+            end_date_tz = pd.Timestamp(self.config.end_date).tz_localize(data.index.tz)
 
         current_price = self.api.get_latest_trade(self.config.symbol).price
         last_date_in_data = data.index[-1].date()
-        end_date_tz = pd.Timestamp(self.config.end_date).tz_localize(
-            data.index.tz
-        )
         if last_date_in_data == end_date_tz.date():
             if current_price != data.iloc[-1, 0]:
                 data.iloc[-1, 0] = current_price
