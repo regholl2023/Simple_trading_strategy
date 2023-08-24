@@ -95,7 +95,9 @@ class ActionComputer:
     """Class to compute buy/sell actions."""
 
     @staticmethod
-    def compute_actions(symbol, data, end_date, timeframe, convert, window, num_samples):
+    def compute_actions(
+        symbol, data, end_date, timeframe, convert, window, num_samples
+    ):
         """Compute buy/sell actions."""
         buy_actions = data[data["Action"] == "Buy"]
         sell_actions = data[data["Action"] == "Sell"]
@@ -202,7 +204,7 @@ class DataPlotter:
 
         ax1.set_title(
             f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} '
-            f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]:.3f}'
+            f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]:.6f}'
         )
 
         y_values_filtered = data["close_detrend_norm_filt_adj"].to_numpy()
