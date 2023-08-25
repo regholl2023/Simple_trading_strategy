@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Joe's Stock Analysis</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <style>
+        body {
+            background-image: url('{{ url_for('static', filename='background.jpg') }}');
+            background-size: cover;
+            background-repeat: no-repeat;
+	    width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        html {
+            height: 100%;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.7); 
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-lg-6 offset-lg-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="mb-0">Joe's Stock Analysis</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="/analyze" method="post" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="symbol">Symbol:</label>
+                                <input type="text" class="form-control" id="symbol" name="symbol" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="ndays">Number of Days:</label>
+                                <input type="number" class="form-control" id="ndays" name="ndays" value="504">
+                            </div>
+                            <div class="form-group">
+                                <label for="window">Window:</label>
+                                <input type="number" class="form-control" id="window" name="window" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="std_dev">Std Dev:</label>
+                                <input type="text" class="form-control" id="std_dev" name="std_dev" value="0.01">
+                            </div>
+                            <div class="form-group">
+                                <label for="timeframe">Timeframe:</label>
+                                <select class="form-control" id="timeframe" name="timeframe">
+                                    <option value="Day">Day</option>
+                                    <option value="Minute">Minute</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="num_samples">Number of Samples:</label>
+                                <input type="number" class="form-control" id="num_samples" name="num_samples" value="5000">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Analyze</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js" integrity="sha384-eMNCOe7tC1doHpGoJtKh7z7lGz7fuP4F8nfdFvAOA6Gg/z6Y5J6XqqyGXYM2ntX5" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8sh+Wy4Ck4SOF4y4Ck4C2DgHfViXydVeLm+JDM" crossorigin="anonymous"></script>
+</body>
+</html>
