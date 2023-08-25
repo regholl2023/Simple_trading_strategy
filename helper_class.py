@@ -159,6 +159,10 @@ class DataPlotter:
     def plot_close_price(data, symbol, ax1, color_dict, timeframe):
         """Plot close price."""
 
+        # Check if the index is already timezone-aware, and if not, localize to UTC
+        if timeframe != "Minute" and data.index.tz is None:
+            data.index = pd.DatetimeIndex(data.index).tz_localize('UTC', ambiguous='infer')
+
         x_values = (
             range(len(data))
             if timeframe == "Minute"
