@@ -1,6 +1,6 @@
-from flask import Flask, request, jsonify
-from flask import Flask, send_file, render_template
+from flask import Flask, request, send_file, render_template
 from io import BytesIO
+import base64
 
 import numpy as np
 import pandas as pd
@@ -114,22 +114,23 @@ def process_stock_data(symbol, ndays, window, std_dev, timeframe, num_samples):
             LAST_GREEN = None
 
     data.set_index("DateTime", inplace=True)
-    ActionComputer.compute_actions(SYMBOL, data, END_DATE, timeframe)
+    message = ActionComputer.compute_actions(SYMBOL, data, END_DATE, timeframe)
     data["close_detrend_norm_filt_adj"] = data["close_detrend_norm_filt"] * max(
         abs(data["close_detrend"])
     ) + trend_line(x)
 
-    return window_size, data
+    return window_size, data, message
 
 @app.route('/process_stock_data')
-def process_and_visualize_stock_data(symbol, ndays, window, std_dev, timeframe, num_samples, data):
+def process_and_visualize_stock_data(symbol, ndays, window, std_dev, timeframe, num_samples, data, message):
     fig, (ax1, ax2, ax3) = create_plot(data, symbol, window, std_dev, timeframe)
 
     img_stream = BytesIO()
     fig.savefig(img_stream, format='png')
     img_stream.seek(0)
+    img_data = base64.b64encode(img_stream.read()).decode()
 
-    return send_file(img_stream, mimetype='image/png')
+    return render_template('show_image.html', img_data=img_data, message=message)
 
 def create_plot(data, symbol, window, std_dev, timeframe):
     fig, (ax1, ax2, ax3) = plt.subplots(
@@ -168,11 +169,11 @@ def analyze_stock():
     timeframe = request.form.get('timeframe', "Day")
     num_samples = int(request.form.get('num_samples', 5000))
 
-    window, data = process_stock_data(symbol, ndays, window, std_dev, timeframe, num_samples)
+    window, data, message = process_stock_data(symbol, ndays, window, std_dev, timeframe, num_samples)
 
     # Call the other function, passing the parameters
-    return process_and_visualize_stock_data(symbol, ndays, window, std_dev, timeframe, num_samples, data)
+    return process_and_visualize_stock_data(symbol, ndays, window, std_dev, timeframe, num_samples, data, message)
 
 
 if __name__ == '__main__':
-    app.run(host='10.0.0.37', port=5000, debug=True)
+    app.run(host='10.0.0.37', port=5050, debug=True)

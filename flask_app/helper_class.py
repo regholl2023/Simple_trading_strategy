@@ -120,8 +120,9 @@ class ActionComputer:
             percent_change = (
                 (last_price - last_action_price) / last_action_price * 100.0
             )
+            message = ""
             if timeframe == "Minute":
-                print(
+                message = (
                     f"{symbol:5s} last action was {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d:%H:%M")} '
                     f"({rows_from_end:5d} samples ago) at a "
@@ -130,7 +131,7 @@ class ActionComputer:
                 )
             else:
                 df_with_row_number = data.reset_index()
-                print(
+                message = (
                     f"{symbol:5s} last action was {last_action:4s} on "
                     f'{last_action_date.strftime("%Y-%m-%d")} '
                     f"({rows_from_end:4d} trading-days ago) at a "
@@ -138,7 +139,9 @@ class ActionComputer:
                     f"percent change {percent_change:9.3f}"
                 )
         else:
-            print("No Buy or Sell actions were recorded.")
+            message = "No Buy or Sell actions were recorded."
+
+        return message
 
 def get_company_name(symbol):
     """Get company name by symbol."""
