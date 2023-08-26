@@ -33,6 +33,11 @@
         }
         .message {
             margin-left: 20px;  /* Move the message to the right */
+	    margin-top: -5px;
+            background-color: black;  /* Added solid black background */
+            color: yellow !important;  /* Forced yellow text color */
+            padding: 5px;  /* Added padding */
+	    border-radius: 8px;
         }
         .btn-move-up {
             margin-bottom: 20px;
@@ -60,7 +65,7 @@
                         <img src="data:image/png;base64,{{ img_data }}" alt="Stock Analysis" class="img-fluid" />
                         <div class="bottom-section mt-4">
                             <a href="/" class="btn btn-primary btn-move-up">Back to Form</a>
-                            <p class="text-black message">{{ message }}</p>  <!-- Added class 'message' here -->
+                            <p class="text-black message">{{ message }}</p>
                         </div>
                     </div>
                 </div>
@@ -70,3 +75,4 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm" crossorigin="anonymous"></script>
 </body>
 </html>
+
