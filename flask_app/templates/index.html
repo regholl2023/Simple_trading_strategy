@@ -20,7 +20,7 @@
             background: rgba(255, 255, 255, 0.7); 
         }
         .analyze-button {
-            margin-top: 20px; /* Added margin to move the button down */
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -36,32 +36,32 @@
                         <form action="/analyze" method="post" enctype="multipart/form-data">
                             <div class="form-group">
                                 <label for="symbol">Symbol:</label>
-                                <input type="text" class="form-control" id="symbol" name="symbol" required>
+                                <input type="text" class="form-control" id="symbol" name="symbol" value="{{ symbol }}" required>
                             </div>
                             <div class="form-group">
                                 <label for="ndays">Number of Days:</label>
-                                <input type="number" class="form-control" id="ndays" name="ndays" value="504">
+                                <input type="number" class="form-control" id="ndays" name="ndays" value="{{ ndays }}">
                             </div>
                             <div class="form-group">
                                 <label for="window">Window:</label>
-                                <input type="number" class="form-control" id="window" name="window" value="0">
+                                <input type="number" class="form-control" id="window" name="window" value="{{ window }}">
                             </div>
                             <div class="form-group">
                                 <label for="std_dev">Std Dev:</label>
-                                <input type="text" class="form-control" id="std_dev" name="std_dev" value="0.01">
+                                <input type="text" class="form-control" id="std_dev" name="std_dev" value="{{ std_dev }}">
                             </div>
                             <div class="form-group">
                                 <label for="timeframe">Timeframe:</label>
                                 <select class="form-control" id="timeframe" name="timeframe">
-                                    <option value="Day">Day</option>
-                                    <option value="Minute">Minute</option>
+                                    <option value="Day" {% if timeframe == 'Day' %}selected{% endif %}>Day</option>
+                                    <option value="Minute" {% if timeframe == 'Minute' %}selected{% endif %}>Minute</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label for="num_samples">Number of Samples:</label>
-                                <input type="number" class="form-control" id="num_samples" name="num_samples" value="5000">
+                                <input type="number" class="form-control" id="num_samples" name="num_samples" value="{{ num_samples }}">
                             </div>
-                            <button type="submit" class="btn btn-primary analyze-button">Analyze</button> <!-- Added class for styling -->
+                            <button type="submit" class="btn btn-primary analyze-button">Analyze</button>
                         </form>
                     </div>
                 </div>

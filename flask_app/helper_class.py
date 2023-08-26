@@ -5,6 +5,7 @@ import subprocess
 import pandas as pd
 
 from dateutil import tz
+from pytz import timezone
 from pandas import Timestamp
 from alpaca_trade_api.rest import REST
 
@@ -29,6 +30,13 @@ class DataConfig:
         self.ndays = ndays
         self.sample_rate = sample_rate
         self.ns = num_samples
+
+
+from pytz import timezone
+import pandas as pd
+import os
+from alpaca_trade_api import REST
+from dateutil import tz
 
 
 class DataFetcher:
@@ -57,6 +65,9 @@ class DataFetcher:
             local_tz = tz.tzlocal()
             data.index = data.index.tz_convert(local_tz)
             end_date_tz = pd.Timestamp(self.config.end_date).tz_localize(data.index.tz)
+        else:
+            # Make sure the DatetimeIndex is tz-naive for consistency
+            data.index = data.index.tz_localize(None)
 
         current_price = self.api.get_latest_trade(self.config.symbol).price
         last_date_in_data = data.index[-1].date()
@@ -67,6 +78,7 @@ class DataFetcher:
             data = data.append(
                 pd.DataFrame({"close": current_price}, index=[end_date_tz])
             )
+
         data["DateTime"] = data.index
         data.reset_index(drop=True, inplace=True)
 
@@ -76,7 +88,6 @@ class DataFetcher:
             data = data[-self.config.ndays :]
 
         return current_price, data
-
 
 class ActionComputer:
     """Class to compute buy/sell actions."""
@@ -161,9 +172,9 @@ class DataPlotter:
     def plot_close_price(data, symbol, ax1, color_dict, timeframe):
         """Plot close price."""
 
-        # Check if the index is already timezone-aware, and if not, localize to UTC
-        if timeframe != "Minute" and data.index.tz is None:
-            data.index = pd.DatetimeIndex(data.index).tz_localize('UTC', ambiguous='infer')
+        # Check if the index is a DatetimeIndex and if it's timezone-aware, and if not, localize to UTC
+        if timeframe != "Minute" and isinstance(data.index, pd.DatetimeIndex) and data.index.tz is None:
+            data.index = data.index.tz_localize('UTC', ambiguous='infer')
 
         x_values = (
             range(len(data))
