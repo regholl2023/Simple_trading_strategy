@@ -185,9 +185,14 @@ class DataPlotter:
 
         ax1.plot(x_values, y_values)
 
+        last_price = data["close"].iloc[-1]
+        price_before = data["close"].iloc[-2]
+        percent_change = ( ( last_price - price_before ) / price_before ) * 100.0
+
         ax1.set_title(
             f'Close price for {symbol} from {data.index.min().strftime("%Y-%m-%d")} '
-            f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {data["close"].iloc[-1]}'
+            f'to {data.index.max().strftime("%Y-%m-%d")}, last price: {last_price:.3f} '
+            f'percent_change: {percent_change:.2f}'
         )
 
         y_values_filtered = data["close_detrend_norm_filt_adj"].to_numpy()
